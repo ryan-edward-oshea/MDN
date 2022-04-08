@@ -362,7 +362,7 @@ def generate_config(args, create=True, verbose=True):
 	return folder 
 
 
-def _load_datasets(keys, locs, wavelengths, allow_missing=False):
+def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_bool=True):
 	''' 
 	Load data from [<locs>] using <keys> as the columns. 
 	Only loads data which has all the bands defined by 
@@ -396,6 +396,7 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False):
 
 		# CDOM is just an alias for a_cdom(443) or a_g(443)
 		if 'cdom' in name and not dloc.exists():
+			loc = Path(loc).parent.joinpath('HYPER')
 			dloc = Path(loc).joinpath('ag.csv')
 			required_wvl = [443]
 
@@ -403,7 +404,7 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False):
 			required_wvl = np.array(required_wvl).flatten()
 			assert(dloc.exists()), (f'Key {name} does not exist at {loc} ({dloc})') 
 
-			data = np.loadtxt(dloc, delimiter=',', dtype=float if name not in ['../Dataset', '../meta', '../datetime'] else str, comments=None)
+			data = np.loadtxt(dloc, delimiter=',', dtype=float if name not in ['../Dataset', '../meta', '../datetime', '../folder_name'] else str, comments=None)
 			if len(data.shape) == 1: data = data[:, None]
 
 			if data.shape[1] > 1 and data.dtype.type is not np.str_:
@@ -524,7 +525,7 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False):
 
 	# Fit exponential function to ad and ag values, and eliminate samples with too much error
 	for product in ['ad', 'ag']:
-		if product in slices:
+		if product in slices and filter_ad_ag_bool:
 			from .metrics import mdsa
 			from scipy.optimize import curve_fit
 
@@ -550,9 +551,7 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False):
 				# else:         remove[i] = True # NaNs / negatives in the sample
 
 			# Don't actually drop them yet, in case we are fetching all samples regardless of nan composition
-			x_data[remove] = np.nan
-			y_data[remove] = np.nan
-			l_data[remove] = np.nan
+			y_data[remove,slices[product]] = np.nan
 
 			if remove.sum():
 				print(f'Removed {remove.sum()} / {len(remove)} samples due to poor quality {product} spectra')
@@ -643,7 +642,7 @@ def get_data(args):
 		get_dataset = lambda path, p: Path(path.as_posix().replace(f'/{sensor}','').replace(f'/{p}.csv','')).stem
 
 		for product in products:
-			if product in ['chl', 'tss', 'cdom']:
+			if product in ['chl', 'tss', 'cdom','secchi', 'pc','Fuco','waterTemperature','salinity','turbidity','spim','spom','depth','conductivity','microcystin']:
 				product = f'../{product}'
 		
 			# Find all datasets with the given product available
@@ -667,7 +666,7 @@ def get_data(args):
 	assert(len(data_keys)),  f'No variables found for {products} within {data_path}/*/{sensor}'
 	
 	sensor_loc = [data_path.joinpath(f, sensor) for f in data_folder]
-	x_data, y_data, slices, sources = _load_datasets(data_keys, sensor_loc, bands, allow_missing=('-nan' in args.sensor) or (getattr(args, 'align', None) is not None))
+	x_data, y_data, slices, sources = _load_datasets(data_keys, sensor_loc, bands, allow_missing=args.allow_missing or ('-nan' in args.sensor) or (getattr(args, 'align', None) is not None),filter_ad_ag_bool=args.filter_ad_ag)
 
 	# Hydrolight simulated CDOM is incorrectly scaled
 	if using_feature(args, 'sim') and 'cdom' in slices:
@@ -689,8 +688,7 @@ def get_data(args):
 		y_data = [y_data] + y_align
 
 	# if -nan IS in the sensor label: do not filter samples; allow all, regardless of nan composition
-	if '-nan' not in args.sensor:
-		(x_data, *_), (y_data, *_), (sources, *_) = _filter_invalid(x_data, y_data, slices, other=[sources], allow_nan_out=not using_feature(args, 'sim') and len(data_keys) > 2)
+	(x_data, *_), (y_data, *_), (sources, *_) = _filter_invalid(x_data, y_data, slices, other=[sources],allow_nan_inp= args.allow_nan_inp or '-nan'  in args.sensor, allow_nan_out= args.allow_nan_out )
 			
 	print('\nFinal counts:')
 	print('\n'.join([f'\tN={num:>5} | {loc}' for loc, num in zip(*np.unique(sources[:, 0], return_counts=True))]))
