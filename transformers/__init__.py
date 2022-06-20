@@ -50,6 +50,7 @@ def generate_scalers(args, x_train=None, x_test=None, column_bagging=False):
 
 	# Add additional features to the inputs
 	if using_feature(args, 'ratio'):
+		#print('Using ratio')
 		kwargs = {}
 		if using_feature(args, 'excl_Rrs'):  kwargs.update({'excl_Rrs'    : True})
 		if using_feature(args, 'all_ratio'): kwargs.update({'all_ratio' : True})

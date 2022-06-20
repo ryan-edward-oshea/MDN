@@ -43,6 +43,7 @@ def get_estimates(args, x_train=None, y_train=None, x_test=None, y_test=None, ou
 		setattr(args, 'datasets_hash', sets_hash)
 
 	model_path = generate_config(args, create=x_train is not None)	
+	print("Model Path:",model_path.name)
 	args.config_name = model_path.name
 	
 	predict_kwargs = {
@@ -221,7 +222,7 @@ def generate_estimates(args, bands, x_train, y_train, x_test, y_test, slices, lo
 
 def main():
 	args = get_args()
-
+	args.benchmark = True
 	# If a file was given, estimate the product for the Rrs contained within
 	if args.filename:
 		filename = Path(args.filename)
@@ -263,7 +264,8 @@ def main():
 
 	# Train a model with partial data, and benchmark on remaining
 	elif args.benchmark:
-
+		print(args)
+		input('Hold')
 		if args.dataset == 'sentinel_paper':
 			setattr(args, 'fix_tchl', True)
 			setattr(args, 'seed', 1234)
@@ -279,7 +281,9 @@ def main():
 		benchmarks = generate_estimates(args, bands, x_train, y_train, x_test, y_test, slices, locs)
 		labels     = get_labels(bands, slices, y_test.shape[1])
 		products   = args.product.split(',')
-		plot_scatter(y_test, benchmarks, bands, labels, products, args.sensor)
+        #Split by product
+		for product in products:
+				plot_scatter(y_test[:,slices[product]], benchmarks, bands, labels[slices[product]], product, args.sensor)
 
 	# Otherwise, train a model with all data (if not already existing)
 	else:

@@ -100,7 +100,7 @@ class MDN:
 				 scalerx=None, scalery=None, 
 				 model_path='Weights', model_name='MDN',
 				 no_load=False, no_save=False,
-				 seed=None, verbose=False, debug=False, **kwargs):
+				 seed=None, verbose=True, debug=False, **kwargs):
 
 		config = initialize_random_states(seed)
 		config.update({
@@ -338,8 +338,8 @@ class MDN:
 			for _ in range(N)], 0)
 
 		# Much slower due to cond executing both branches regardless of the conditional
-		# likelihood = tf.cond(tf.reduce_any(tf.math.is_nan(y)), lambda: impute(mix, y, self.imputations), lambda: mix.log_prob(y))
-		likelihood = mix.log_prob(y)
+		likelihood = tf.cond(tf.reduce_any(tf.math.is_nan(y)), lambda: impute(mix, y, self.imputations), lambda: mix.log_prob(y))
+# 		likelihood = mix.log_prob(y)
 		return tf.reduce_mean(-likelihood) + tf.add_n([0.] + self.model.losses)
 
 

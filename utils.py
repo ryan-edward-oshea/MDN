@@ -395,7 +395,7 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_boo
 				dloc = Path(loc).joinpath(f'{name.replace("tsm","spm")}.csv')
 
 		# CDOM is just an alias for a_cdom(443) or a_g(443)
-		if 'cdom' in name and not dloc.exists():
+		if 'cdom' in name and 'Scdom' not in name and not dloc.exists():
 			loc = Path(loc).parent.joinpath('HYPER')
 			dloc = Path(loc).joinpath('ag.csv')
 			required_wvl = [443]
@@ -642,15 +642,15 @@ def get_data(args):
 		get_dataset = lambda path, p: Path(path.as_posix().replace(f'/{sensor}','').replace(f'/{p}.csv','')).stem
 
 		for product in products:
-			if product in ['chl', 'tss', 'cdom','secchi', 'pc','Fuco','waterTemperature','salinity','turbidity','spim','spom','depth','conductivity','microcystin']:
+			if product in ['chl', 'tss', 'cdom','secchi', 'pc','Fuco','Peri','waterTemperature','salinity','turbidity','spim','spom','depth','conductivity','microcystin','Scdom443','Snap443','nap']:
 				product = f'../{product}'
 		
 			# Find all datasets with the given product available
 			safe_prod = product.replace('*', '[*]') # Prevent glob from getting confused by wildcard
 			datasets  = [get_dataset(path, product) for path in data_path.glob(f'*/{sensor}/{safe_prod}.csv')]
 
-			if product == 'aph':
-				datasets = [d for d in datasets if d not in ['PACE']]
+			#if product == 'aph':PACE data may be slightly off.
+			#	datasets = [d for d in datasets if d not in ['PACE']]
 			
 			if getattr(args, 'subset', ''):
 				datasets = [d for d in datasets if d in args.subset.split(',')]

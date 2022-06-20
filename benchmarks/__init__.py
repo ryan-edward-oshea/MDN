@@ -70,7 +70,7 @@ def run_benchmarks(sensor, x_test, y_test=None, x_train=None, y_train=None, slic
 		raise Exception('Training data must be passed to use ML/Opt models')
 
 	# Set the avaliable products for each set of benchmarking methods
-	products_rs  = ['chl', 'tss', 'cdom', 'a', 'aph', 'ap', 'ag', 'aph', 'adg', 'b', 'bbp']
+	products_rs  = ['chl', 'tss', 'cdom', 'pc', 'a', 'aph', 'ap', 'ag', 'aph', 'adg', 'b', 'bbp']
 	products_ml  = ['chl', 'tss', 'cdom']
 	products_opt = ['chl', 'tss', 'cdom']
 
