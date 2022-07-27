@@ -1,10 +1,9 @@
 from .metrics import slope, sspb, mdsa 
-from .meta import get_sensor_label
+from .meta import get_sensor_label,get_sensor_bands
 from .utils import closest_wavelength, ignore_warnings
 from collections import defaultdict as dd 
 from pathlib import Path 
 import numpy as np 
-
 
 def add_identity(ax, *line_args, **line_kwargs):
     ''' 
@@ -280,7 +279,7 @@ def default_dd(d={}, f=lambda k: k):
 
 
 @ignore_warnings
-def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None, methods=None, n_col=3, img_outlbl=''):
+def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None, methods=None, n_col=3, img_outlbl='',args=None):
     import matplotlib.patheffects as pe 
     import matplotlib.ticker as ticker
     import matplotlib.pyplot as plt 
@@ -324,13 +323,16 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
     # Only plot certain bands
     if len(labels) > 3 :
         product_bands = {
-            'default' : [443,482,530,620,673,700]#[415,443,490,501,550,620,673,690] #[443,482,561,655]
-            # 'aph'     : [443, 530],
+            'default' :  [443,482,561,655] if 'OLI'  in sensor else [443,490,560,620,673,710]  if 'OLCI' in sensor  else [409,  444,  490, 535,  558,  581,]  if args.use_HICO_aph  else  [443,478,535,620,673,690]  #[415,443,490,501,550,620,673,690] #[443,482,561,655]
+            # 'aph'     : [443, 530], [409, 421, 432, 444, 455, 467, 478, 490, 501, 512, 524, 535, 547, 558, 570, 581, 593, 604, 616, 621, 633, 644, 650, 656, 667, 673, 679, 684, 690, 701, 713, 724,]
         }
 
         target     = [closest_wavelength(w, bands) for w in product_bands.get(products[0], product_bands['default'])]
         print('Target',target)
         plot_label = [w in target for w in bands]
+        if args.use_HICO_aph: 
+            plot_label_aph = [w in target for w in get_sensor_bands('HICO-aph', args)]
+            #y_test=y_test[:,[ i in get_sensor_bands('HICO-aph', args) for i in  get_sensor_bands(sensor, args)]]
         plot_order =  ['MDN','QAA','GIOP']
         plot_bands = True
     else:
@@ -344,7 +346,7 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
             if 'chl' in products and len(products) == 1:
             #     # benchmarks = benchmarks['chl']
             #     if 'MLP' in benchmarks:
-                plot_order = ['MDN', 'Gilerson_2band', 'Smith_Blend'] #OC3 GIOP
+                plot_order = ['MDN', 'Gilerson_2band', 'Smith_Blend']  if 'OLI' not in sensor else   ['MDN',]   #OC3 GIOP , 'Gilerson_2band', 'Smith_Blend'
             if 'tss' in products and len(products) == 1:
                 #     # benchmarks = benchmarks['chl']
                 #     if 'MLP' in benchmarks:
@@ -356,7 +358,7 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
             if 'pc' in products and len(products) == 1:
                 #     # benchmarks = benchmarks['chl']
                 #     if 'MLP' in benchmarks:
-                    plot_order = ['MDN', 'Schalles','Sim2005']
+                    plot_order = ['MDN','Schalles','Sim2005'] if 'OLI' not in sensor else  ['MDN',]  #'Schalles','Sim2005'
             
             #     else:
             #         plot_order = ['MDN']
@@ -424,9 +426,14 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
         full_ax.set_title(fr'$\mathbf{{\underline{{\large{{{s_lbl}}}}}}}$'.replace(' ', '\ '), fontsize=24, y=1.03)
 
     for plt_idx, (label, y_true) in enumerate(zip(labels, y_test.T)):
-        if not plot_label[plt_idx]: continue 
+        
 
+        
         product, title = label 
+        if args.use_HICO_aph and product=='aph':
+            if not plot_label_aph[plt_idx]: continue 
+        else:
+            if not plot_label[plt_idx]: continue 
         plabel = f'{product_labels[product]} {product_units[product]}'
 
         for est_idx, est_lbl in enumerate(plot_order[product] if isinstance(plot_order, dict) else plot_order):
@@ -437,7 +444,13 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
                 curr_idx += 1
                 continue 
             if est_lbl =='GIOP' or est_lbl =='QAA':
-                benchmarks[product][est_lbl] = np.reshape(benchmarks[product][est_lbl],np.shape(benchmarks[product]['MDN']))
+                if not args.use_HICO_aph or (np.shape(benchmarks[product][est_lbl])[1] !=  np.shape(get_sensor_bands('HICO-aph', args))[0] and args.use_HICO_aph):
+                    benchmarks[product][est_lbl] = np.reshape(benchmarks[product][est_lbl],(-1,np.shape(get_sensor_bands(sensor, args))[0]))   #if not args.use_HICO_aph  else np.reshape(benchmarks[product][est_lbl],(-1,np.shape(get_sensor_bands('HICO-aph', args))[0])) #if np.shape(benchmarks[product][est_lbl])[0] == 1786*np.shape(get_sensor_bands(sensor, args))[0] else  np.reshape(benchmarks[product][est_lbl],(1786,np.shape(get_sensor_bands(sensor, args))[0])) #np.shape(benchmarks[product]['MDN']))
+                #Resample to HICO_aph wavelengths
+                if args.use_HICO_aph and np.shape(benchmarks[product][est_lbl])[1] ==  np.shape(get_sensor_bands(sensor, args))[0]:
+                    benchmarks[product][est_lbl] = benchmarks[product][est_lbl][:,[ i in get_sensor_bands('HICO-aph', args) for i in  get_sensor_bands(sensor, args)]]
+                    
+                    
             y_est = benchmarks[product][est_lbl] if isinstance(plot_order, dict) else benchmarks[product][est_lbl][..., plt_idx]
             ax    = axes[curr_idx]
             cidx  = (curr_idx % n_col) if plot_bands else curr_idx
@@ -472,11 +485,17 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
                 ax2.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False, pad=0)
                 ax2.grid(False)
                 ax2.set_yticklabels([])
-                ax2.set_ylabel(fr'$\mathbf{{{bands[plt_idx]:.0f}nm}}$' f"\n" f"N={sum(np.isfinite(y_true))}", fontsize=20)
+                if args.use_HICO_aph and product == 'aph':
+                    bands_aph = get_sensor_bands('HICO-aph', args)
+                    ax2.set_ylabel(fr'$\mathbf{{{bands_aph[plt_idx]:.0f}nm}}$' f"\n" f"N={sum(np.isfinite(y_true))}", fontsize=20)
+                else:
+                    ax2.set_ylabel(fr'$\mathbf{{{bands[plt_idx]:.0f}nm}}$' f"\n" f"N={sum(np.isfinite(y_true))}", fontsize=20)
+
+
 
             minv = -3 if product == 'cdom' else 0.000 if product == 'Scdom443' else .005 if product == 'Snap443' else int(np.nanmin(y_true_log)) - 1 if product != 'aph'  else -4
             maxv = 3 if product == 'tss' else 4 if product == 'chl' else .035 if product == 'Scdom443' else .02 if product == 'Snap443' else int(np.nanmax(y_true_log)) + 1 if product != 'aph'  else 2
-            loc  = ticker.LinearLocator(numticks=int(round(maxv-minv+1.5)))
+            loc  = ticker.LinearLocator(numticks=int(round(maxv-minv+1)))
             fmt  = ticker.FuncFormatter(lambda i, _: r'$10$\textsuperscript{%i}'%i)
             
             ax.set_ylim((minv, maxv))
@@ -488,8 +507,8 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
                 ax.yaxis.set_major_formatter(fmt)
             else:
                 if product == 'Scdom443':
-                    ax.xaxis.set_ticks(np.arange(0, 5, 0.01))
-                    ax.yaxis.set_ticks(np.arange(0, 5, 0.01))
+                    ax.xaxis.set_ticks(np.arange(0, 0.03, 0.01))
+                    ax.yaxis.set_ticks(np.arange(0, 0.03, 0.01))
                 if product == 'Snap443':
                     ax.xaxis.set_ticks(np.arange(0.0025, 0.02, 0.01))
                     ax.yaxis.set_ticks(np.arange(0.0025, 0.02, 0.01))

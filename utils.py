@@ -190,10 +190,12 @@ def split_data(x_data, other_data=[], n_train=0.5, n_valid=0, seed=None, shuffle
 	if 0 < n_valid <= 1: n_valid = int(n_valid * len(idxs))
 	assert((n_train+n_valid) <= len(x_data)), \
 		'Too many training/validation samples requested: {n_train}, {n_valid} ({len(x_data)} available)'
-
-	train = [d[ idxs[:n_train] ]                for d in data]
+        
+	train_idxs = idxs[:n_train]
+	test_idxs = idxs[n_train+n_valid:]
+	train = [d[ train_idxs ]                for d in data]
 	valid = [d[ idxs[n_train:n_valid+n_train] ] for d in data]
-	test  = [d[ idxs[n_train+n_valid:] ]        for d in data]
+	test  = [d[ test_idxs ]        for d in data]
 
 	# Return just the split x_data if no other data was given
 	if len(data) == 1:
@@ -203,7 +205,7 @@ def split_data(x_data, other_data=[], n_train=0.5, n_valid=0, seed=None, shuffle
 
 	# If no validation data was requested, just return train/test
 	if n_valid == 0:
-		return train, test 
+		return train, test, train_idxs ,test_idxs
 	return train, valid, test
 
 
@@ -362,7 +364,7 @@ def generate_config(args, create=True, verbose=True):
 	return folder 
 
 
-def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_bool=True):
+def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_bool=True,args=None):
 	''' 
 	Load data from [<locs>] using <keys> as the columns. 
 	Only loads data which has all the bands defined by 
@@ -383,7 +385,7 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_boo
 												 [bbp443, bbp483, bbp561, bbp655, chl], 
 											 	 {'bbp':slice(0,4), 'chl':slice(4,5)}
 	'''
-	def loadtxt(name, loc, required_wvl): 
+	def loadtxt(name, loc, required_wvl,args=None): 
 		''' Error handling wrapper over np.loadtxt, with the addition of wavelength selection'''
 		dloc = Path(loc).joinpath(f'{name}.csv')
 		
@@ -399,7 +401,13 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_boo
 			loc = Path(loc).parent.joinpath('HYPER')
 			dloc = Path(loc).joinpath('ag.csv')
 			required_wvl = [443]
-
+		if 'aph' in name:
+			#print('Name', name)
+			#required_wvl = [443, 530, 690,]
+			#required_wvl = [409, 415, 421, 426, 432, 438, 444, 449, 455, 461, 467, 472, 478, 484, 490, 495, 501, 507, 512, 518, 524, 530, 535, 541, 547, 553, 558, 564, 570, 575, 581, 587, 593, 598, 604, 610,616, 621,627, 633, 638, 644, 650, 656, 661,]#get_sensor_bands('OLCI-IOP', args)
+			if args.use_HICO_aph: required_wvl =  get_sensor_bands('HICO-aph', args)#[409, 421, 432, 444, 455, 467, 478, 490, 501, 512, 524, 535, 547, 558, 570, 581, 593, 604, 616, 621, 633, 644, 650, 656, 667, 673, 679, 684, 690, 701, 713, 724,],
+        				   
+        				
 		try:
 			required_wvl = np.array(required_wvl).flatten()
 			assert(dloc.exists()), (f'Key {name} does not exist at {loc} ({dloc})') 
@@ -467,7 +475,7 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_boo
 	l_data = []
 	for loc in locs:
 		try:
-			loc_data = [loadtxt(key, loc, wavelengths) for key in keys]
+			loc_data = [loadtxt(key, loc, wavelengths,args=args) for key in keys]
 			print(f'\tN={len(loc_data[0]):>5} | {loc.parts[-1]} / {loc.parts[-2]} ({[np.isfinite(ld).all(1).sum() if ld.dtype.type is not np.str_ else len(ld) for ld in loc_data[1:]]})')
 			assert(all([len(l) in [len(loc_data[0]), 0] for l in loc_data])), dict(zip(keys, map(np.shape, loc_data)))
 
@@ -623,7 +631,7 @@ def get_data(args):
 	np.random.seed(args.seed)
 	sensor   = args.sensor.split('-')[0]
 	products = args.product.split(',')
-	bands    = get_sensor_bands(args.sensor, args)
+	bands    = get_sensor_bands(args.sensor, args) #'OLCI-IOP'
 
 	# Using Hydrolight simulated data
 	if using_feature(args, 'sim'):
@@ -666,7 +674,7 @@ def get_data(args):
 	assert(len(data_keys)),  f'No variables found for {products} within {data_path}/*/{sensor}'
 	
 	sensor_loc = [data_path.joinpath(f, sensor) for f in data_folder]
-	x_data, y_data, slices, sources = _load_datasets(data_keys, sensor_loc, bands, allow_missing=args.allow_missing or ('-nan' in args.sensor) or (getattr(args, 'align', None) is not None),filter_ad_ag_bool=args.filter_ad_ag)
+	x_data, y_data, slices, sources = _load_datasets(data_keys, sensor_loc, bands, allow_missing=args.allow_missing or ('-nan' in args.sensor) or (getattr(args, 'align', None) is not None),filter_ad_ag_bool=args.filter_ad_ag,args=args)
 
 	# Hydrolight simulated CDOM is incorrectly scaled
 	if using_feature(args, 'sim') and 'cdom' in slices:
