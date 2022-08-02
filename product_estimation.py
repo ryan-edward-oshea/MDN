@@ -221,8 +221,8 @@ def generate_estimates(args, bands, x_train, y_train, x_test, y_test, slices, lo
     return benchmarks
 
 
-def main():
-    args = get_args()
+def main(kwargs):
+    args = get_args(kwargs,use_cmdline=False)
     args.benchmark = True
     # If a file was given, estimate the product for the Rrs contained within
     if args.filename:
@@ -340,7 +340,7 @@ def main():
 
             assert(0)               
         print(args)
-        input('Hold')
+        # input('Hold')
         if args.dataset == 'sentinel_paper':
             setattr(args, 'fix_tchl', True)
             setattr(args, 'seed', 1234)
@@ -354,32 +354,38 @@ def main():
         (x_train, y_train), (x_test, y_test), train_idxs, test_idxs = split_data(x_data, y_data, n_train=n_train, seed=args.seed)
 
         benchmarks = generate_estimates(args, bands, x_train, y_train, x_test, y_test, slices, locs)
-        aph_idx = 3
-        aph_estimates_MDN_lowest_wvl = benchmarks['aph']['MDN'][:,aph_idx]
-        aph_truth_values = y_test[:,slices['aph']][:,aph_idx]
-        chl_truths = y_test[:,slices['chl']][:]
-        plt.scatter(np.squeeze(chl_truths),aph_truth_values)
-        plt.xscale('log')
-        plt.yscale('log')
-        plt.xlabel('Chl (mgm-3)')
-        plt.ylabel('aph (m-1)')
+        # aph_idx = 3
+        # aph_estimates_MDN_lowest_wvl = benchmarks['aph']['MDN'][:,aph_idx]
+        # aph_truth_values = y_test[:,slices['aph']][:,aph_idx]
+        # chl_truths = y_test[:,slices['chl']][:]
+        # plt.scatter(np.squeeze(chl_truths),aph_truth_values)
+        # plt.xscale('log')
+        # plt.yscale('log')
+        # plt.xlabel('Chl (mgm-3)')
+        # plt.ylabel('aph (m-1)')
 
-        plt.plot()
+        # plt.plot()
         
-        symmetric_accuracy = 100 * (np.exp((np.abs(np.log(aph_estimates_MDN_lowest_wvl / aph_truth_values)))) - 1)
-        locs_high_conc = aph_truth_values > 1
-        sorted_symmetric_accuracy_high_conc, sorted_loc_idx_with_high_conc, aph_truths_sorted_accuracy = zip(*sorted(zip(symmetric_accuracy[locs_high_conc], locs[test_idxs[locs_high_conc]][:,0],aph_truth_values[locs_high_conc]))) 
+        # symmetric_accuracy = 100 * (np.exp((np.abs(np.log(aph_estimates_MDN_lowest_wvl / aph_truth_values)))) - 1)
+        # locs_high_conc = np.logical_and(aph_truth_values > 0.5,aph_truth_values < 5)
+        # sorted_symmetric_accuracy_high_conc, sorted_loc_idx_with_high_conc, aph_truths_sorted_accuracy = zip(*sorted(zip(symmetric_accuracy[locs_high_conc], locs[test_idxs[locs_high_conc]][:,0],aph_truth_values[locs_high_conc]))) 
         
-        print(sorted_symmetric_accuracy_high_conc)
-        print(sorted_loc_idx_with_high_conc)
-        print(aph_truths_sorted_accuracy)
+        # print(sorted_symmetric_accuracy_high_conc)
+        # print(sorted_loc_idx_with_high_conc)
+        # print(aph_truths_sorted_accuracy)
 
 
         labels     = get_labels(get_sensor_bands('HICO-aph', args) if args.use_HICO_aph else bands, slices, y_test.shape[1])
         products   = args.product.split(',')
+        args.summary_stats = {}
         #Split by product
         for product in products:
                 plot_scatter(y_test[:,slices[product]], benchmarks, bands, labels[slices[product]], product, args.sensor,args=args)
+        import pickle
+        file = open('scatter_plots/' + args.config_name+'/args.pkl', 'wb')
+        pickle.dump(args,file)
+        return args
+        #saves the plots and config to a folder with the models name
 
     # Otherwise, train a model with all data (if not already existing)
     else:

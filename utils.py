@@ -406,7 +406,8 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_boo
 			#required_wvl = [443, 530, 690,]
 			#required_wvl = [409, 415, 421, 426, 432, 438, 444, 449, 455, 461, 467, 472, 478, 484, 490, 495, 501, 507, 512, 518, 524, 530, 535, 541, 547, 553, 558, 564, 570, 575, 581, 587, 593, 598, 604, 610,616, 621,627, 633, 638, 644, 650, 656, 661,]#get_sensor_bands('OLCI-IOP', args)
 			if args.use_HICO_aph: required_wvl =  get_sensor_bands('HICO-aph', args)#[409, 421, 432, 444, 455, 467, 478, 490, 501, 512, 524, 535, 547, 558, 570, 581, 593, 604, 616, 621, 633, 644, 650, 656, 667, 673, 679, 684, 690, 701, 713, 724,],
-        				   
+		if 'ag' in name or 'ad' in name:
+			required_wvl = [443, 490, 547, 593, 644,]
         				
 		try:
 			required_wvl = np.array(required_wvl).flatten()

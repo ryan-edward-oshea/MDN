@@ -38,7 +38,15 @@ def add_identity(ax, *line_args, **line_kwargs):
     }
     ax.annotate(r'$\mathbf{1:1}$', xy=(0.87,0.99), size=11, **ann_kwargs)
 
-
+def create_stats_HPC(y_true, y_est, metrics=[mdsa, sspb, slope],label=None):
+    ''' Create metrics for model comparison '''
+    summary_metrics = {}
+    for metric in metrics:
+        # print(metric.__name__)
+        label = metric.__name__#.replace('SSPB', 'Bias').replace('MdSA', 'Error')
+        print(label, metric(y_true, y_est))
+        summary_metrics[label] = metric(y_true, y_est)
+    return summary_metrics
 
 def _create_metric(metric, y_true, y_est, longest=None, label=None):
     ''' Create a position-aligned string which shows the performance via a single metric '''
@@ -323,7 +331,7 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
     # Only plot certain bands
     if len(labels) > 3 :
         product_bands = {
-            'default' :  [443,482,561,655] if 'OLI'  in sensor else [443,490,560,620,673,710]  if 'OLCI' in sensor  else [409,  444,  490, 535,  558,  581,]  if args.use_HICO_aph  else  [443,478,535,620,673,690]  #[415,443,490,501,550,620,673,690] #[443,482,561,655]
+            'default' :  [443,482,561,655] if 'OLI'  in sensor else [443,490,560,620,673,710]  if 'OLCI' in sensor  else [409,  444,  490, 535,  558,  581,]  if args.use_HICO_aph  else  [409,443,478,535,620,673,690,724]  #[415,443,490,501,550,620,673,690] #[443,482,561,655]
             # 'aph'     : [443, 530], [409, 421, 432, 444, 455, 467, 478, 490, 501, 512, 524, 535, 547, 558, 570, 581, 593, 604, 616, 621, 633, 644, 650, 656, 667, 673, 679, 684, 690, 701, 713, 724,]
         }
 
@@ -359,7 +367,8 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
                 #     # benchmarks = benchmarks['chl']
                 #     if 'MLP' in benchmarks:
                     plot_order = ['MDN','Schalles','Sim2005'] if 'OLI' not in sensor else  ['MDN',]  #'Schalles','Sim2005'
-            
+            if len(products) == 1:
+                plot_order = [val  for i,val in enumerate(plot_order) if val in benchmarks[products[0]].keys()]
             #     else:
             #         plot_order = ['MDN']
             # elif len(products) == 3 and all(k in products for k in ['chl', 'tss', 'cdom']):
@@ -428,7 +437,7 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
     for plt_idx, (label, y_true) in enumerate(zip(labels, y_test.T)):
         
 
-        
+
         product, title = label 
         if args.use_HICO_aph and product=='aph':
             if not plot_label_aph[plt_idx]: continue 
@@ -534,6 +543,11 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
 
             if valid.sum():
                 add_stats_box(ax, y_true[valid], y_est[valid])
+                if plot_order[est_idx] == 'MDN' and product == 'aph': 
+                    args.summary_stats[label[1]] = create_stats_HPC(y_true[valid], y_est[valid], metrics=[mdsa, sspb, slope],label=None)
+                else: 
+                    args.summary_stats[label[1]] = create_stats_HPC(y_true[valid], y_est[valid], metrics=[mdsa, sspb, slope],label=None)
+
 
             if first_row or not plot_bands or (isinstance(plot_order, dict) and plot_order[product][est_idx] != 'MDN'):
                 if est_lbl == 'BST':
@@ -560,7 +574,11 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
             #text(0.9,0.1,f'N={sum(np.isfinite(y_true))}',fontsize=12)
             
     u_label  = ",".join([o.split('_')[0] for o in plot_order]) if len(plot_order) < 10 else f'{n_row}x{n_col}'
-    filename = folder.joinpath(f'{img_outlbl}{",".join(products)}_{sensor}_{n_pts}test_{u_label}.png')
+    out_dir = args.config_name
+    print('OUTLBL is: ',out_dir)
+    import os
+    os.makedirs(str(folder) + '/' + out_dir,exist_ok=True)
+    filename = folder.joinpath(f'{out_dir}/{img_outlbl}{",".join(products)}_{sensor}_{n_pts}test_{u_label}.png')
     plt.tight_layout()
     # plt.subplots_adjust(wspace=0.35)
     plt.savefig(filename.as_posix(), dpi=100, bbox_inches='tight', pad_inches=0.1,)
