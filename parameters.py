@@ -36,7 +36,7 @@ parser.add_argument("--LOO_CV",    action ="store_true", help="Leave-one-out cro
 update = parser.add_argument_group('Model Parameters', 'Parameters which require a new model to be trained if they are changed')
 update.add_argument("--sat_bands", action ="store_true", help="Use bands specific to certain products when utilizing satellite retrieved spectra")
 update.add_argument("--benchmark", default=True,action ="store_true", help="Train only on partial dataset, and use remaining to benchmark")
-update.add_argument("--product",   default="aph,chl,tss,cdom,pc,ag",        help="Product to estimate") #aph,chl,tss,cdom,nap,pc,Scdom443,Snap443 #,tss,cdom,nap,pc,Scdom443,Snap443  # "chl,tss,cdom,nap,pc,Scdom443,Snap443,aph,secchi" #"chl,tss,cdom,nap,pc,Scdom443,Snap443,aph,secchi"#"chl,tss,cdom,pc,ag,aph,ad"
+update.add_argument("--product",   default="aph,chl,tss,cdom,pc,ag,ad",        help="Product to estimate") #aph,chl,tss,cdom,nap,pc,Scdom443,Snap443 #,tss,cdom,nap,pc,Scdom443,Snap443  # "chl,tss,cdom,nap,pc,Scdom443,Snap443,aph,secchi" #"chl,tss,cdom,nap,pc,Scdom443,Snap443,aph,secchi"#"chl,tss,cdom,pc,ag,aph,ad"
 update.add_argument("--sensor",    default="HICO",        help="Sensor to estimate from (See meta.py for available options)")
 update.add_argument("--align",     default=None,         help="Comma-separated list of sensors to align data with; passing \"all\" uses all sensors (See meta.py for available options)")
 update.add_argument("--model_lbl", default="",      	 help="Label for a model")
