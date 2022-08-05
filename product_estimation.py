@@ -375,7 +375,7 @@ def main(kwargs):
         # print(aph_truths_sorted_accuracy)
 
 
-        labels     = get_labels(get_sensor_bands('HICO-aph', args) if args.use_HICO_aph else bands, slices, y_test.shape[1])
+        labels     = get_labels(bands, slices, y_test.shape[1], wavelengths_ad_ag= get_sensor_bands('HICO-adag', args) if args.use_HICO_aph else None, wavelengths_aph=get_sensor_bands('HICO-aph', args) if args.use_HICO_aph else None,use_HICO_aph=args.use_HICO_aph) #get_labels(get_sensor_bands('HICO-aph', args) if args.use_HICO_aph else bands, slices, y_test.shape[1])
         products   = args.product.split(',')
         args.summary_stats = {}
         #Split by product

@@ -331,17 +331,26 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
     # Only plot certain bands
     if len(labels) > 3 :
         product_bands = {
-            'default' :  [443,482,561,655] if 'OLI'  in sensor else [443,490,560,620,673,710]  if 'OLCI' in sensor  else [409,  444,  490, 535,  558,  581,]  if args.use_HICO_aph  else  [409,443,478,535,620,673,690,724]  #[415,443,490,501,550,620,673,690] #[443,482,561,655]
+            'default' :  [443,482,561,655] if 'OLI'  in sensor else [443,490,560,620,673,710]  if 'OLCI' in sensor  else [409,443,478,535,620,673,690,]  if args.use_HICO_aph  else  [409,443,478,535,620,673,690,724]  #[415,443,490,501,550,620,673,690] #[443,482,561,655]
             # 'aph'     : [443, 530], [409, 421, 432, 444, 455, 467, 478, 490, 501, 512, 524, 535, 547, 558, 570, 581, 593, 604, 616, 621, 633, 644, 650, 656, 667, 673, 679, 684, 690, 701, 713, 724,]
         }
 
-        target     = [closest_wavelength(w, bands) for w in product_bands.get(products[0], product_bands['default'])]
+        target     = [closest_wavelength(w, bands if not args.use_HICO_aph else get_sensor_bands('HICO-aph', args) ) for w in product_bands.get(products[0], product_bands['default'])]
         print('Target',target)
         plot_label = [w in target for w in bands]
         if args.use_HICO_aph: 
             plot_label_aph = [w in target for w in get_sensor_bands('HICO-aph', args)]
             #y_test=y_test[:,[ i in get_sensor_bands('HICO-aph', args) for i in  get_sensor_bands(sensor, args)]]
+        if args.use_HICO_aph and (products[0]=='ad' or products[0]=='ag'): 
+                product_bands = {
+                    'default' :  list(get_sensor_bands('HICO-adag', args))
+                }
+                target     = [closest_wavelength(w, bands if not args.use_HICO_aph else get_sensor_bands('HICO-adag', args)) for w in product_bands.get(products[0], product_bands['default'])]
+                plot_label_aph = [w in target for w in get_sensor_bands('HICO-adag', args)]
+
         plot_order =  ['MDN','QAA','GIOP']
+        plot_order = [val  for i,val in enumerate(plot_order) if val in benchmarks[products[0]].keys()]
+        
         plot_bands = True
     else:
         plot_label = [True] * len(labels)
@@ -439,7 +448,7 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
 
 
         product, title = label 
-        if args.use_HICO_aph and product=='aph':
+        if args.use_HICO_aph and (product=='aph' or product=='ag' or product=='ad'):
             if not plot_label_aph[plt_idx]: continue 
         else:
             if not plot_label[plt_idx]: continue 
@@ -453,12 +462,13 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
                 curr_idx += 1
                 continue 
             if est_lbl =='GIOP' or est_lbl =='QAA':
-                if not args.use_HICO_aph or (np.shape(benchmarks[product][est_lbl])[1] !=  np.shape(get_sensor_bands('HICO-aph', args))[0] and args.use_HICO_aph):
+                if not args.use_HICO_aph or (np.shape(benchmarks[product][est_lbl])[1] !=  np.shape(get_sensor_bands('HICO-aph', args))[0] and args.use_HICO_aph and product=='aph')  or (np.shape(benchmarks[product][est_lbl])[1] !=  np.shape(get_sensor_bands('HICO-adag', args))[0] and args.use_HICO_aph and (product=='ad' or product=='ag' ) ):
                     benchmarks[product][est_lbl] = np.reshape(benchmarks[product][est_lbl],(-1,np.shape(get_sensor_bands(sensor, args))[0]))   #if not args.use_HICO_aph  else np.reshape(benchmarks[product][est_lbl],(-1,np.shape(get_sensor_bands('HICO-aph', args))[0])) #if np.shape(benchmarks[product][est_lbl])[0] == 1786*np.shape(get_sensor_bands(sensor, args))[0] else  np.reshape(benchmarks[product][est_lbl],(1786,np.shape(get_sensor_bands(sensor, args))[0])) #np.shape(benchmarks[product]['MDN']))
                 #Resample to HICO_aph wavelengths
-                if args.use_HICO_aph and np.shape(benchmarks[product][est_lbl])[1] ==  np.shape(get_sensor_bands(sensor, args))[0]:
+                if args.use_HICO_aph and np.shape(benchmarks[product][est_lbl])[1] ==  np.shape(get_sensor_bands(sensor, args))[0] and product == 'aph':
                     benchmarks[product][est_lbl] = benchmarks[product][est_lbl][:,[ i in get_sensor_bands('HICO-aph', args) for i in  get_sensor_bands(sensor, args)]]
-                    
+                if args.use_HICO_aph and np.shape(benchmarks[product][est_lbl])[1] ==  np.shape(get_sensor_bands(sensor, args))[0] and (product == 'ad' or  product == 'ag'):
+                    benchmarks[product][est_lbl] = benchmarks[product][est_lbl][:,[ i in get_sensor_bands('HICO-adag', args) for i in  get_sensor_bands(sensor, args)]]            
                     
             y_est = benchmarks[product][est_lbl] if isinstance(plot_order, dict) else benchmarks[product][est_lbl][..., plt_idx]
             ax    = axes[curr_idx]
@@ -498,7 +508,11 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
                     bands_aph = get_sensor_bands('HICO-aph', args)
                     ax2.set_ylabel(fr'$\mathbf{{{bands_aph[plt_idx]:.0f}nm}}$' f"\n" f"N={sum(np.isfinite(y_true))}", fontsize=20)
                 else:
-                    ax2.set_ylabel(fr'$\mathbf{{{bands[plt_idx]:.0f}nm}}$' f"\n" f"N={sum(np.isfinite(y_true))}", fontsize=20)
+                    if args.use_HICO_aph and (product == 'ad' or product == 'ag' ) :
+                        bands_adag = get_sensor_bands('HICO-adag', args)
+                        ax2.set_ylabel(fr'$\mathbf{{{bands_adag[plt_idx]:.0f}nm}}$' f"\n" f"N={sum(np.isfinite(y_true))}", fontsize=20)
+                    else:
+                        ax2.set_ylabel(fr'$\mathbf{{{bands[plt_idx]:.0f}nm}}$' f"\n" f"N={sum(np.isfinite(y_true))}", fontsize=20)
 
 
 

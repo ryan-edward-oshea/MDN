@@ -73,7 +73,7 @@ def line_messages(messages, nbars=1):
 	sys.stdout.write('\x1b[A'.join([''] * (nbars + len(messages) + 1)))
 
 
-def get_labels(wavelengths, slices, n_out=None):
+def get_labels(wavelengths, slices, n_out=None, wavelengths_ad_ag=None, wavelengths_aph=None,use_HICO_aph=False):
 	''' 
 	Helper to get label for each target output. Assumes 
 	that any variable in <slices> which has more than a 
@@ -87,7 +87,7 @@ def get_labels(wavelengths, slices, n_out=None):
 		labels = get_labels(wavelengths, slices, n_out) 
 			# labels -> ['bbp443', 'bbp483', 'bbp561', 'bbp655', 'chl']
 	'''
-	return [k + (f'{wavelengths[i]:.0f}' if (v.stop - v.start) > 1 else '') 
+	return [k + f'{wavelengths_ad_ag[i]:.0f}' if (v.stop - v.start) > 1  and (k=='ad' or k=='ag') and use_HICO_aph else k + f'{wavelengths_aph[i]:.0f}' if (v.stop - v.start) > 1  and (k=='aph') and use_HICO_aph else k + f'{wavelengths[i]:.0f}' if (v.stop - v.start) > 1 else k + ''
 			for k,v in sorted(slices.items(), key=lambda s: s[1].start)
 			for i   in range(v.stop - v.start)][:n_out]	
 
