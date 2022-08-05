@@ -347,6 +347,7 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
                 }
                 target     = [closest_wavelength(w, bands if not args.use_HICO_aph else get_sensor_bands('HICO-adag', args)) for w in product_bands.get(products[0], product_bands['default'])]
                 plot_label_aph = [w in target for w in get_sensor_bands('HICO-adag', args)]
+        plot_label = [w in target for w in bands]
 
         plot_order =  ['MDN','QAA','GIOP']
         plot_order = [val  for i,val in enumerate(plot_order) if val in benchmarks[products[0]].keys()]
