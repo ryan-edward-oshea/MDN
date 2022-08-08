@@ -343,7 +343,7 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
             #y_test=y_test[:,[ i in get_sensor_bands('HICO-aph', args) for i in  get_sensor_bands(sensor, args)]]
         if args.use_HICO_aph and (products[0]=='ad' or products[0]=='ag'): 
                 product_bands = {
-                    'default' :  list(get_sensor_bands('HICO-adag', args))
+                    'default' :  [409,444,478,535,564,593,621]#list(get_sensor_bands('HICO-adag', args))
                 }
                 target     = [closest_wavelength(w, bands if not args.use_HICO_aph else get_sensor_bands('HICO-adag', args)) for w in product_bands.get(products[0], product_bands['default'])]
                 plot_label_aph = [w in target for w in get_sensor_bands('HICO-adag', args)]
@@ -517,8 +517,8 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
 
 
 
-            minv = -3 if product == 'cdom' else 0.000 if product == 'Scdom443' else .005 if product == 'Snap443' else int(np.nanmin(y_true_log)) - 1 if product != 'aph'  else -4
-            maxv = 3 if product == 'tss' else 4 if product == 'chl' else .035 if product == 'Scdom443' else .02 if product == 'Snap443' else int(np.nanmax(y_true_log)) + 1 if product != 'aph'  else 2
+            minv = -3 if product == 'cdom' else 0.000 if product == 'Scdom443' else .005 if product == 'Snap443' else int(np.nanmin(y_true_log)) - 1 if product != 'aph' and product != 'ag' and product != 'ad'  else -4
+            maxv = 3 if product == 'tss' else 4 if product == 'chl' else .035 if product == 'Scdom443' else .02 if product == 'Snap443' else int(np.nanmax(y_true_log)) + 1 if product != 'aph' and product != 'ag' and product != 'ad'  else 2
             loc  = ticker.LinearLocator(numticks=int(round(maxv-minv+1)))
             fmt  = ticker.FuncFormatter(lambda i, _: r'$10$\textsuperscript{%i}'%i)
             
