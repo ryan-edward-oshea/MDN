@@ -558,10 +558,12 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
 
             if valid.sum():
                 add_stats_box(ax, y_true[valid], y_est[valid])
-                if plot_order[est_idx] == 'MDN' and product == 'aph': 
-                    args.summary_stats[label[1]] = create_stats_HPC(y_true[valid], y_est[valid], metrics=[mdsa, sspb, slope],label=None)
-                else: 
-                    args.summary_stats[label[1]] = create_stats_HPC(y_true[valid], y_est[valid], metrics=[mdsa, sspb, slope],label=None)
+                # if plot_order[est_idx] == 'MDN' and product == 'aph': 
+                #     if plot_order[est_idx] not in args.summary_stats.keys(): args.summary_stats[ plot_order[est_idx]] = {}
+                #     args.summary_stats[ plot_order[est_idx]][label[1]] = create_stats_HPC(y_true[valid], y_est[valid], metrics=[mdsa, sspb, slope],label=None)
+                # else:
+                if plot_order[est_idx] not in args.summary_stats.keys(): args.summary_stats[ plot_order[est_idx]] = {}
+                args.summary_stats[ plot_order[est_idx]][label[1]] = create_stats_HPC(y_true[valid], y_est[valid], metrics=[mdsa, sspb, slope],label=None)
 
 
             if first_row or not plot_bands or (isinstance(plot_order, dict) and plot_order[product][est_idx] != 'MDN'):

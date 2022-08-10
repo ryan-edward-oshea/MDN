@@ -382,7 +382,7 @@ def main(kwargs):
         for product in products:
                 plot_scatter(y_test[:,slices[product]], benchmarks, bands, labels[slices[product]], product, args.sensor,args=args)
         import pickle
-        file = open('scatter_plots/' + args.config_name+'/args.pkl', 'wb')
+        file = open('scatter_plots/' + args.config_name+'/args.pkl', 'wb') #file = open('/home/ryanoshea/in_situ_database/Working_in_situ_dataset/scatter_plots/b89adcedb5c1a74c06fcf0e7668925df18633db48a5fbef55a2c9b830526de74'+'/args.pkl', 'rb')
         pickle.dump(args,file)
         return args
         #saves the plots and config to a folder with the models name
