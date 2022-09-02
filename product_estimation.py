@@ -9,9 +9,9 @@ import hashlib
 
 from .model import MDN
 from .meta  import get_sensor_bands, SENSOR_LABEL, ANCILLARY, PERIODIC
-from .utils import get_labels, get_data, generate_config, using_feature, split_data, _load_datasets, compress
+from .utils import get_labels, get_data, generate_config, using_feature, split_data, _load_datasets, compress, get_matchups
 from .metrics import performance, mdsa, sspb, msa
-from .plot_utils import plot_scatter
+from .plot_utils import plot_scatter, plot_histogram, plot_spectra, plot_remote_insitu
 from .benchmarks import run_benchmarks
 from .parameters import get_args
 from .transformers import TransformerPipeline, generate_scalers
@@ -165,6 +165,7 @@ def image_estimates(data, sensor=None, function=apply_model, rhos=False, anc=Fal
         f'Expected data to have 3 dimensions (height, width, feature). Found shape: {data.shape}')
 
     args = get_args(sensor=sensor, **kwargs)
+    print(args)
     expected_features = len(get_sensor_bands(sensor, args)) + (len(ANCILLARY)+len(PERIODIC) if anc or rhos else 0)
     assert(data.shape[-1] == expected_features), (
         f'Got {data.shape[-1]} features; expected {expected_features} features for sensor {sensor}')
@@ -223,7 +224,39 @@ def generate_estimates(args, bands, x_train, y_train, x_test, y_test, slices, lo
 
 def main(kwargs):
     args = get_args(kwargs,use_cmdline=False)
-    args.benchmark = True
+    if True:
+        import pickle
+
+        # # # args.no_load=False
+        # dictionary_of_matchups = get_matchups(args.sensor)    
+        # # print(dictionary_of_matchups.keys())
+        # # print(dictionary_of_matchups['site_label'])
+        # insitu_Rrs = np.reshape(dictionary_of_matchups['insitu_Rrs_resampled'],(1,-1,len(get_sensor_bands(args.sensor))))
+        # remote_Rrs = np.reshape(dictionary_of_matchups['Rrs_retrieved'],(1,-1,len(get_sensor_bands(args.sensor))))
+
+        
+        # with open('insitu_Rrs.pickle', 'wb') as insitu_Rrs_file:
+        #     pickle.dump(insitu_Rrs, insitu_Rrs_file, protocol=pickle.HIGHEST_PROTOCOL)
+        # with open('remote_Rrs.pickle', 'wb') as remote_Rrs_file:
+        #     pickle.dump(remote_Rrs, remote_Rrs_file, protocol=pickle.HIGHEST_PROTOCOL)
+        # with open('dictionary_of_matchups.pickle', 'wb') as dictionary_of_matchups_file:
+        #     pickle.dump(dictionary_of_matchups, dictionary_of_matchups_file, protocol=pickle.HIGHEST_PROTOCOL)
+
+        with open('insitu_Rrs.pickle', 'rb') as insitu_Rrs_file:
+            insitu_Rrs = pickle.load(insitu_Rrs_file)
+            with open('remote_Rrs.pickle', 'rb') as remote_Rrs_file:
+                remote_Rrs = pickle.load(remote_Rrs_file)  
+                with open('dictionary_of_matchups.pickle', 'rb') as dictionary_of_matchups_file:
+                    dictionary_of_matchups = pickle.load(dictionary_of_matchups_file)  
+            
+                    print("In situ shape",np.shape(insitu_Rrs),"Remote shape",np.shape(remote_Rrs))
+                        
+                    estimates_in_situ = image_estimates(data=insitu_Rrs,args=args,**kwargs)
+                    estimates_remote  = image_estimates(data=remote_Rrs,args=args,**kwargs)
+                    plot_remote_insitu(y_remote=estimates_remote, y_insitu=estimates_in_situ,dictionary_of_matchups=dictionary_of_matchups,products=['chl','tss','pc','aph','ag','ad'],sensor=args.sensor,run_name="sample",args=args)
+        assert(0)
+
+    #args.benchmark = True
     # If a file was given, estimate the product for the Rrs contained within
     if args.filename:
         filename = Path(args.filename)
@@ -350,7 +383,7 @@ def main(kwargs):
         bands   = get_sensor_bands(args.sensor, args)
         n_train = 0.5 if args.dataset != 'sentinel_paper' else 1000
         x_data, y_data, slices, locs = get_data(args)
-
+        # input('Hold')
         (x_train, y_train), (x_test, y_test), train_idxs, test_idxs = split_data(x_data, y_data, n_train=n_train, seed=args.seed)
 
         benchmarks = generate_estimates(args, bands, x_train, y_train, x_test, y_test, slices, locs)
@@ -381,6 +414,9 @@ def main(kwargs):
         #Split by product
         for product in products:
                 plot_scatter(y_test[:,slices[product]], benchmarks, bands, labels[slices[product]], product, args.sensor,args=args)
+                if product in ['aph'] and True: 
+                    plot_spectra(y_test[:,slices[product]], benchmarks, bands, labels[slices[product]], product, args.sensor,args=args,y_full=y_test,slices=slices)
+        
         import pickle
         file = open('scatter_plots/' + args.config_name+'/args.pkl', 'wb') #file = open('/home/ryanoshea/in_situ_database/Working_in_situ_dataset/scatter_plots/b89adcedb5c1a74c06fcf0e7668925df18633db48a5fbef55a2c9b830526de74'+'/args.pkl', 'rb')
         pickle.dump(args,file)
@@ -389,5 +425,17 @@ def main(kwargs):
 
     # Otherwise, train a model with all data (if not already existing)
     else:
-        x_data, y_data, slices, locs = get_data(args)
+        if 'latlon' in args.product.split(','):  
+            x_data, y_data, slices, locs, latlons = get_data(args)
+            latlons = [i.split(',') for i in latlons]
+            import pandas as pd
+            latlons_df = {'latlons' : latlons}
+            latlons_df = pd.DataFrame(latlons_df)
+            latlons_df2 = pd.DataFrame(latlons_df['latlons'].to_list(), columns=['lat','lon']).to_csv('lat_lons.csv',index=False)
+        else:
+            x_data, y_data, slices, locs = get_data(args)
+
+
+        products   = args.product.split(',') 
+        # plot_histogram(y_data,products,slices,locs)
         get_estimates(args, x_data, y_data, output_slices=slices, dataset_labels=locs[:,0])

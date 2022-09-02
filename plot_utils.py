@@ -4,6 +4,8 @@ from .utils import closest_wavelength, ignore_warnings
 from collections import defaultdict as dd 
 from pathlib import Path 
 import numpy as np 
+from matplotlib.pyplot import text
+from .spectrum_rgb import get_spectrum_cmap
 
 def add_identity(ax, *line_args, **line_kwargs):
     ''' 
@@ -331,7 +333,7 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
     # Only plot certain bands
     if len(labels) > 3 :
         product_bands = {
-            'default' :  [443,482,561,655] if 'OLI'  in sensor else [443,490,560,620,673,710]  if 'OLCI' in sensor  else [409,443,478,535,620,673,690,]  if args.use_HICO_aph  else  [409,443,478,535,620,673,690,724]  #[415,443,490,501,550,620,673,690] #[443,482,561,655]
+            'default' :  [443,482,561,655] if 'OLI'  in sensor else [443,490,560,620,673,710]  if 'OLCI' in sensor  else [443,530,620,673,]  if args.use_HICO_aph  else  [409,443,478,535,620,673,690,724]  #[415,443,490,501,550,620,673,690] #[443,482,561,655]
             # 'aph'     : [443, 530], [409, 421, 432, 444, 455, 467, 478, 490, 501, 512, 524, 535, 547, 558, 570, 581, 593, 604, 616, 621, 633, 644, 650, 656, 667, 673, 679, 684, 690, 701, 713, 724,]
         }
 
@@ -598,5 +600,594 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
     filename = folder.joinpath(f'{out_dir}/{img_outlbl}{",".join(products)}_{sensor}_{n_pts}test_{u_label}.png')
     plt.tight_layout()
     # plt.subplots_adjust(wspace=0.35)
-    plt.savefig(filename.as_posix(), dpi=100, bbox_inches='tight', pad_inches=0.1,)
+    plt.savefig(filename.as_posix(), dpi=400, bbox_inches='tight', pad_inches=0.1,)
     plt.show()
+
+def plot_spectra(y_test, benchmarks, bands, labels, products, sensor, title=None, methods=None, n_col=3, img_outlbl='',args=None,y_full=None,slices=None):
+    aph_wavelengths = get_sensor_bands('HICO-aph', args) if args.use_HICO_aph else get_sensor_bands(sensor, args)
+    ag_wavelengths = get_sensor_bands('HICO-adag', args) if args.use_HICO_aph else get_sensor_bands(sensor, args)
+    product_labels = default_dd({
+        'chl' : 'Chl\\textit{a}',
+        'aph' : '\\textit{a}_{ph}',
+        'ad' : '\\textit{a}_{d}',
+        'ag' : '\\textit{a}_{g}',
+        'tss' : 'TSS',
+        'pc' : 'PC',
+        'cdom': '\\textit{a}_{CDOM}',   
+    })
+    
+    product_units = default_dd({
+        'chl' : '[mg m^{-3}]',
+        'pc' : '[mg m^{-3}]',
+        'tss' : '[g m^{-3}]',
+        'aph' : '[m^{-1}]',
+        'ad' : '[m^{-1}]',
+        'ag' : '[m^{-1}]',
+
+        'cdom': '[m^{-1}]',
+    }, lambda k: '')
+    
+    font = {'family' : 'normal',
+            'weight' : 'bold',
+            'size'   : 20}
+    
+    import matplotlib.pyplot as plt
+    from matplotlib.figure import figaspect
+    import scipy.stats as stats
+
+    folder = Path('scatter_plots')
+    folder.mkdir(exist_ok=True, parents=True)
+    colors = ['aqua', 'orangered',  'xkcd:tangerine', 'xkcd:fresh green', 'xkcd:clay', 'magenta', 'xkcd:sky blue', ]
+    index = 1
+    for index in range(len(y_test)):
+        if sum(np.isnan(y_test[index,:])) or sum(np.isnan(y_full[:,slices['chl']][index,:])) or sum(np.isnan(y_full[:,slices['pc']][index,:])): continue
+        if index not in [1297,2099,2263]: continue
+        W, H = figaspect(0.4)
+        fig = plt.figure(figsize=(1.5*W, 1.5*H))
+        
+        ax = fig.add_subplot(131)
+        ax.grid(color='black',alpha=0.1)
+        ax.set_axisbelow(True)
+        ax.plot(aph_wavelengths,benchmarks['aph']['MDN'][index,:],label='MDN',color=colors[3])
+        ax.plot(aph_wavelengths,benchmarks['aph']['GIOP'][index,:],label='GIOP',color=colors[1])
+        ax.plot(aph_wavelengths,benchmarks['aph']['QAA'][index,:],label='QAA',color=colors[2])
+        ax.plot(aph_wavelengths,y_test[index,:],label='Truth',color='k')
+        plabel = f'{product_labels["aph"]} {product_units["aph"]}'
+    
+        if index  in [2263]: ax.set_title(fr'$\mathbf{{{plabel}}}$',fontsize=28)
+        plabel_x = f'Wavelength \ [nm]'
+        # ax.set_xlabel(fr'$\mathbf{{{plabel_x}}}$')
+        chl_conc = str(round(y_full[:,slices['chl']][index][0],1))
+        chl_conc = f'{chl_conc:>7}'.replace(" ","\ ")
+        pc_conc =  str(round(y_full[:,slices['pc']][index][0],1))
+        pc_conc = f'{pc_conc:>7}'.replace(" ","\ ")
+
+        cdom_conc = str(round(y_full[:,slices['cdom']][index][0],1))
+        cdom_conc = f'{cdom_conc:>5}'.replace(" ","\ ")
+
+        tss_conc = str(round(y_full[:,slices['tss']][index][0],1))
+        tss_conc = f'{tss_conc:>7}'.replace(" ","\ ")
+
+        from pylab import text
+
+        if index  in [2263]: ax.legend()
+        ax.set_xlim([400,700])
+    
+        ax = fig.add_subplot(132)
+    
+        ax.grid(color='black',alpha=0.1)
+        ax.set_axisbelow(True)
+        ax.plot(ag_wavelengths,benchmarks['ag']['MDN'][index,:],label='MDN',color=colors[3])
+        QAA =  np.reshape(benchmarks['ag']['QAA'],(-1,np.shape(get_sensor_bands(sensor, args))[0]))
+        ax.plot(bands,QAA[index,:],label='QAA',color=colors[2])
+        ax.plot(ag_wavelengths,y_full[:,slices['ag']][index,:],label='Truth',color='k')
+        plabel = f'{product_labels["ag"]} {product_units["ag"]}'
+        
+        if index  in [2263]:ax.set_title(fr'$\mathbf{{{plabel}}}$',fontsize=28)
+        plabel_x = f'Wavelength \ [nm]'
+        if index not in [2099,2263]: ax.set_xlabel(fr'$\mathbf{{{plabel_x}}}$',fontsize=28)
+        ax.set_xlim([400,700])
+        chl_text = "Chl:" 
+        text(0.65,0.865,f'Chl:\ \ \ \ {{{{{chl_conc}}}}}  \n PC: \ \ \ \ {{{pc_conc}}} \n CDOM: {{{cdom_conc}}} \nTSS: \ \ {tss_conc}   ',horizontalalignment='left',verticalalignment='center',transform=ax.transAxes,backgroundcolor='1.0',bbox=dict(facecolor='white',edgecolor='black',boxstyle='round'),fontdict=font)
+
+        ax = fig.add_subplot(133)
+    
+        ax.grid(color='black',alpha=0.1)
+        ax.set_axisbelow(True)
+        ax.plot(ag_wavelengths,benchmarks['ad']['MDN'][index,:],label='MDN',color=colors[3])
+        ax.plot(ag_wavelengths,y_full[:,slices['ad']][index,:],label='Truth',color='k')
+        plabel = f'{product_labels["ad"]} {product_units["ad"]}'
+        
+        if index  in [2263]: ax.set_title(fr'$\mathbf{{{plabel}}}$',fontsize=28)
+        plabel_x = f'Wavelength \ [nm]'
+        # ax.set_xlabel(fr'$\mathbf{{{plabel_x}}}$')
+        ax.set_xlim([400,700])
+
+        out_dir = args.config_name
+        print('OUTLBL is: ',out_dir)
+        import os
+        os.makedirs(str(folder) + '/' + out_dir,exist_ok=True)
+        filename = folder.joinpath(f'{out_dir}/spectral_products/{img_outlbl}Spectral_products_{sensor}_{index}_test.png')    
+        plt.tight_layout()
+        # plt.subplots_adjust(wspace=0.35)
+        plt.savefig(filename.as_posix(), dpi=400, bbox_inches='tight', pad_inches=0.1,)
+        plt.show()  
+        plt.close('all')
+                                                
+
+def plot_histogram(product_values,products,slices,locs):
+    PC_loc = slices["pc"]
+    chl_loc = slices["chl"]
+    cdom_loc = slices["cdom"]
+    tss_loc = slices["tss"]
+    
+    
+    import matplotlib.pyplot as plt
+    from matplotlib.figure import figaspect
+    import scipy.stats as stats
+    folder = Path('scatter_plots')
+    folder.mkdir(exist_ok=True, parents=True)
+    W, H = figaspect(0.4)
+    fig = plt.figure(figsize=(W, H))
+    ax = fig.add_subplot(221)
+    ax.grid(color='black',alpha=0.1)
+    ax.set_axisbelow(True)
+    colors = ['aqua', 'orangered',  'xkcd:tangerine', 'xkcd:fresh green', 'xkcd:clay', 'magenta', 'xkcd:sky blue', ]
+    product_labels = default_dd({
+        'chl' : 'Chl\\textit{a}',
+        'pc'  : 'PC',
+        'tss'  : 'TSS',
+        'cdom'  : 'CDOM',
+
+        'chl/pc': 'Chl\\textit{a}:PC',
+        'pc/chl': 'PC:Chl\\textit{a}',
+
+    })
+    product_units = default_dd({
+        'chl' : '[mg m^{-3}]',
+        'pc' : '[mg m^{-3}]',
+
+        'tss' : '[g m^{-3}]',
+        'cdom'  : '[m^{-1}]',
+
+        'aph' : '[m^{-1}]',
+    }, lambda k: '')
+    plt_idx = 0
+    plabel = f'{product_labels["chl"]} {product_units["chl"]}'
+    xlabel = fr'$\mathbf{{{plabel}}}$'
+
+    bin_locations = np.linspace(-1,3)
+    x_vals = np.log10(product_values[np.squeeze(~np.isnan(product_values[:,chl_loc])),chl_loc])
+    # ax.set_title(f'N={sum(np.isfinite(x_vals))}')
+    n,bins,patches = ax.hist(x_vals,bins=bin_locations,facecolor='xkcd:dark mint green',edgecolor='white',linewidth=0.5,density=False,log=False,alpha=0.75)
+    text(min(bins*.75),max(n*.9),f'N={sum(np.isfinite(x_vals))[0]}',fontsize=12)
+
+    ax.set_xlabel(xlabel.replace(' ', '\ '),fontsize=15)
+    ylabel = fr'$\mathbf{{Frequency}}$'
+
+    # ax.set_ylabel(ylabel.replace(' ', '\ '),fontsize=15)
+    ax.tick_params(axis='both',which='minor',labelsize=13)
+    ax.tick_params(axis='both',which='major',labelsize=13)
+    ax.set_facecolor('xkcd:white')
+
+    labels = ax.get_xticklabels(which='both')
+    locs = ax.get_xticks()
+
+    xtick_labels = [int(value) for value in locs] 
+    xtick_labels = [fr'${{10^{ {value} }}}$' for value in xtick_labels]
+
+    ax.set_xticks(locs)
+    ax.set_xticklabels(xtick_labels)
+    ax.set_xlim((-1,3))
+
+    plt_idx = 1
+    plabel = f'{product_labels["pc"]} {product_units["pc"]}'
+    xlabel = fr'$\mathbf{{{plabel}}}$'
+
+    ax = fig.add_subplot(222)
+    ax.grid(color='black',alpha=0.1)
+    ax.set_axisbelow(True)
+    x_vals = np.log10(product_values[:,PC_loc])
+    # ax.set_title(f'N={sum(np.isfinite(x_vals))}')
+    # text(-0.75,200,f'N={sum(np.isfinite(x_vals))[0]}',fontsize=12)
+
+    n,bins,patches  = ax.hist(x_vals,bins=bin_locations,facecolor='xkcd:cool blue',edgecolor='white',linewidth=0.5,density=False,log=False,alpha=0.75)
+    text(min(bins*.75),max(n*.9),f'N={sum(np.isfinite(x_vals))[0]}',fontsize=12)
+    ax.set_xlabel(xlabel.replace(' ', '\ '),fontsize=15)
+    ax.tick_params(axis='both',which='minor',labelsize=13)
+    ax.tick_params(axis='both',which='major',labelsize=13)
+    ax.set_facecolor('xkcd:white')
+
+    labels = ax.get_xticklabels(which='both')
+    locs = ax.get_xticks()
+
+    xtick_labels = [int(value) for value in locs] 
+    xtick_labels = [fr'${{10^{ {value} }}}$' for value in xtick_labels]
+    ax.set_xticks(locs)
+    ax.set_xticklabels(xtick_labels)
+    ax.set_xlim((-1,3))
+
+    plt_idx = 2
+    plabel = f'{product_labels["tss"]} {product_units["tss"]}'
+    xlabel = fr'$\mathbf{{{plabel}}}$'
+
+    ax = fig.add_subplot(223)
+    ax.grid(color='black',alpha=0.1)
+    ax.set_axisbelow(True)
+    x_vals = np.log10(product_values[:,tss_loc])
+    # ax.set_title(f'N={sum(np.isfinite(x_vals))}')
+    # text(-0.75,200,f'N={sum(np.isfinite(x_vals))[0]}',fontsize=12)
+
+
+    bin_locations = np.linspace(-1,3)
+
+    n,bins,patches  = ax.hist(x_vals,bins=bin_locations,facecolor='xkcd:burnt orange',edgecolor='white',linewidth=0.5,density=False,log=False,alpha=0.75)
+    text(min(bins*.75),max(n*.9),f'N={sum(np.isfinite(x_vals))[0]}',fontsize=12)
+    ax.set_xlabel(xlabel.replace(' ', '\ '),fontsize=15)
+    ax.tick_params(axis='both',which='minor',labelsize=13)
+    ax.tick_params(axis='both',which='major',labelsize=13)
+    ax.set_facecolor('xkcd:White')
+
+    labels = ax.get_xticklabels(which='both')
+    locs = ax.get_xticks()
+
+    xtick_labels = [int(value) for value in locs] 
+    xtick_labels = [fr'${{10^{ {value} }}}$' for value in xtick_labels]
+    ax.set_xticks(locs)
+    ax.set_xticklabels(xtick_labels)
+    ax.set_xlim((-1,3))
+
+    plt_idx = 3
+    plabel = f'{product_labels["cdom"]} {product_units["cdom"]}'
+    xlabel = fr'$\mathbf{{{plabel}}}$'
+
+    ax = fig.add_subplot(224)
+    ax.grid(color='black',alpha=0.1)
+    ax.set_axisbelow(True)
+    x_vals = np.log10(product_values[:,cdom_loc])
+    bin_locations = np.linspace(-3,2)
+    # ax.set_title(f'N={sum(np.isfinite(x_vals))}')
+    # text(-0.75,200,f'N={sum(np.isfinite(x_vals))[0]}',fontsize=12)
+
+
+    n,bins,patches  = ax.hist(x_vals,bins=bin_locations,facecolor='xkcd:red brown',edgecolor='white',linewidth=0.5,density=False,log=False,alpha=0.75)
+    text(min(bins*.88),max(n*.9),f'N={sum(np.isfinite(x_vals))[0]}',fontsize=12)
+    ax.set_xlabel(xlabel.replace(' ', '\ '),fontsize=15)
+    ax.tick_params(axis='both',which='minor',labelsize=13)
+    ax.tick_params(axis='both',which='major',labelsize=13)
+    ax.set_facecolor('xkcd:White')
+
+    labels = ax.get_xticklabels(which='both')
+    locs = ax.get_xticks()
+
+    xtick_labels = [int(value) for value in locs] 
+    xtick_labels = [fr'${{10^{ {value} }}}$' for value in xtick_labels]
+    ax.set_xticks(locs)
+    ax.set_xticklabels(xtick_labels)
+    ax.set_xlim((-3,2))
+
+
+    filename = folder.joinpath(f'Product_histogram_{np.shape(product_values)}.jpg')
+    font = {'family' : 'normal',
+            'weight' : 'bold',
+            'size'   : 20}
+    fig.text(-0.02, 0.5, 'Frequency', va='center', rotation='vertical',**font)
+
+    plt.tight_layout()
+    plt.savefig(filename.as_posix(), dpi=600, bbox_inches='tight', pad_inches=0.1,)
+    plt.close()
+
+    print('Mean of {}: {} Median of {}:'.format(products[0],np.mean(product_values[:,chl_loc]),np.median(product_values[:,chl_loc])))
+    print('Mean of {}: {} Median of {}:'.format(products[1],np.mean(product_values[:,PC_loc]),np.median(product_values[:,PC_loc])))
+    print('Mean of {}: {} Median of {}:'.format(products[1],np.mean(product_values[:,PC_loc]/product_values[:,chl_loc]),np.median(product_values[:,PC_loc]/product_values[:,chl_loc])))
+
+
+@ignore_warnings
+def plot_remote_insitu(y_remote, y_insitu, dictionary_of_matchups=None, products='chl', sensor='HICO',run_name="",args=None):
+    y_remote_OG =y_remote
+    y_insitu_OG=y_insitu
+
+    import matplotlib.patheffects as pe
+    import matplotlib.ticker as ticker
+    import matplotlib.pyplot as plt
+    import matplotlib
+    import seaborn as sns
+    from pylab import text
+
+    folder = Path('scatter_plots')
+    folder.mkdir(exist_ok=True, parents=True)
+    n_row = 2
+    n_col = 3
+    fig_size   = 5
+    plt_idx = 0
+    plt.rc('text', usetex=True)
+    plt.rcParams['mathtext.default']='regular'
+
+    fig, axes = plt.subplots(n_row, n_col, figsize=(fig_size*n_col, fig_size*n_row))
+    axes      = [ax for axs in np.atleast_1d(axes) for ax in np.atleast_1d(axs)]
+    colors    = ['xkcd:sky blue', 'xkcd:tangerine', 'xkcd:fresh green', 'xkcd:greyish blue', 'xkcd:goldenrod',  'xkcd:clay', 'xkcd:bluish purple', 'xkcd:reddish', 'xkcd:neon purple']
+
+    full_ax  = fig.add_subplot(111, frameon=False)
+    full_ax.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False, pad=10)
+
+    product_labels = default_dd({
+        'chl' : 'Chl\\textit{a}',
+        'PC'  : 'PC'
+    })
+
+    product_units = default_dd({
+        'chl' : '[mg m^{-3}]',
+        'PC' : '[mg m^{-3}]',
+
+        'tss' : '[g m^{-3}]',
+        'aph' : '[m^{-1}]',
+    }, lambda k: '')
+
+    font= {'size':15}
+    for current_product in products:
+        print(plt_idx,'current product:',current_product )
+        # if current_product in ['aph']:
+            
+        y_remote = np.squeeze(np.asarray(y_remote_OG[0][:,:,y_remote_OG[1][current_product]]))#[:,0]
+        y_insitu = np.squeeze(np.asarray(y_insitu_OG[0][:,:,y_insitu_OG[1][current_product]]))#[:,0]
+
+
+
+        plabel_1 = f'{product_labels[products[plt_idx]]}'
+        plabel_2 = f'{product_units[products[plt_idx]]}'
+        xlabel = fr'$\mathbf{{{plabel_1}\textsuperscript{{e}}{plabel_2}}}$'
+        ylabel = fr'$\mathbf{{{plabel_1}\textsuperscript{{r}}{plabel_2}}}$'
+
+
+        s_lbl = get_sensor_label(sensor).replace('-',' ')
+        n_pts = len(y_insitu)
+        title = fr'$\mathbf{{\underline{{\large{{{s_lbl}}}}}}}$' + '\n' + fr'$\small{{\mathit{{N\small{{=}}}}{n_pts}}}$'
+        full_ax.set_title(title.replace(' ', '\ '), fontsize=24, y=1.04)
+
+        curr_idx = 0
+        cidx  = plt_idx
+        color = colors[cidx]
+        l_kws = {'color': color if current_product not in ['aph','ad','ag'] else 'k', 'path_effects': [pe.Stroke(linewidth=4, foreground='k'), pe.Normal()], 'zorder': 22, 'lw': 1}
+        s_kws = {'alpha': 0.4 if current_product not in ['aph','ad','ag'] else 0.0, 'color': color}
+
+        ax = axes[plt_idx]
+        ax.set_xlabel(xlabel.replace(' ', '\ '), fontsize=20, labelpad=10)
+        ax.set_ylabel(ylabel.replace(' ', '\ '), fontsize=20, labelpad=10)
+
+
+        y_true_log = np.log10(y_insitu).flatten()
+        y_est_log = np.log10(y_remote).flatten()
+        minv = int(np.nanmin(y_true_log)) - 1
+        maxv = int(np.nanmax(y_true_log)) + 1
+        loc  = ticker.LinearLocator(numticks=maxv-minv+1)
+        fmt  = ticker.FuncFormatter(lambda i, _: r'$10$\textsuperscript{%i}'%i)
+
+        ax.set_ylim((minv, maxv))
+        ax.set_xlim((minv, maxv))
+        ax.xaxis.set_major_locator(loc)
+        ax.yaxis.set_major_locator(loc)
+        ax.xaxis.set_major_formatter(fmt)
+        ax.yaxis.set_major_formatter(fmt)
+        valid = np.logical_and(np.isfinite(y_true_log), np.isfinite(y_est_log))
+        print('valid matchups:',sum(valid))
+        
+        bands  = np.array( get_sensor_bands(args.sensor, args) ) if args.use_HICO_aph == False and current_product == 'aph' else  np.array( get_sensor_bands('HICO-aph', args) ) if args.use_HICO_aph == True and current_product == 'aph' else  np.array( get_sensor_bands('HICO-adag', args) ) if args.use_HICO_aph == True and (current_product == 'ad' or current_product == 'ag') else np.array( get_sensor_bands(args.sensor, args) ) 
+        norm = matplotlib.colors.Normalize(vmin=380.0, vmax=780.0)
+        cmap   = get_spectrum_cmap()
+        colors_wavelength = [cmap.to_rgba(nm)  for nm in bands]
+        
+        
+        if valid.sum():
+            sns.regplot(y_true_log[valid], y_est_log[valid], ax=ax, scatter_kws=s_kws, line_kws=l_kws, fit_reg=True, truncate=False, robust=True, ci=None)
+            if current_product in ['aph','ad','ag']: 
+                for i in range(np.shape(y_insitu)[1]):
+                    y_true_log_wavelength = np.log10(y_insitu[:,i])
+                    y_est_log_wavelength = np.log10(y_remote[:,i])
+                    valid_wavelength = np.logical_and(np.isfinite(y_true_log_wavelength),np.isfinite(y_est_log_wavelength))
+                    ax.scatter(y_true_log_wavelength[valid_wavelength], y_est_log_wavelength[valid_wavelength],color=colors_wavelength[i])
+            kde = sns.kdeplot(y_true_log[valid], y_est_log[valid], shade=False, ax=ax, bw='scott', n_levels=4, legend=False, gridsize=100, color='k')
+            if current_product not in ['aph','ad','ag']: kde.collections[2].set_alpha(0)
+
+
+
+
+        if len(valid.flatten()) != valid.sum() and False:
+            ax.scatter(y_true_log[~valid], [minv]*(~valid).sum(), color='r', alpha=0.4, label=r'$\mathbf{%s\ invalid, %s\ nan}$' % ((~valid).sum(), np.isnan(y_true_log[~valid]).sum()) ) 
+            ax.legend(loc='lower right', prop={'weight':'bold', 'size': 16})
+
+        add_identity(ax, ls='--', color='k', zorder=20)
+        add_stats_box(ax, y_insitu.flatten()[valid], y_remote.flatten()[valid])
+
+        ax.tick_params(labelsize=12)
+        ax.grid('on', alpha=0.3)
+
+        filename = folder.joinpath(f'remote_vs_insitu_summary_{run_name}_{products}_{sensor}.jpg')
+        plt.tight_layout()
+        plt_idx = plt_idx+1
+
+    plt.savefig(filename.as_posix(), dpi=600, bbox_inches='tight', pad_inches=0.1,)
+
+    plt_idx = 0 
+
+    n_row = 4
+    n_col = 4
+    fig_size   = 5
+    plt_idx = 0
+    plt.rc('text', usetex=True)
+    plt.rcParams['mathtext.default']='regular'
+
+    fig, axes = plt.subplots(n_row, n_col, figsize=(fig_size*n_col, fig_size*n_row))
+    axes      = [ax for axs in np.atleast_1d(axes) for ax in np.atleast_1d(axs)]
+    colors    = ['xkcd:sky blue', 'xkcd:tangerine', 'xkcd:fresh green', 'xkcd:greyish blue', 'xkcd:goldenrod',  'xkcd:clay', 'xkcd:bluish purple', 'xkcd:reddish', 'xkcd:neon purple']
+
+    full_ax  = fig.add_subplot(111, frameon=False)
+    full_ax.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False, pad=10)
+
+    xlabel = fr'$\mathbf{{Band [nm]}}$'
+    ylabel = fr'$\mathbf{{R\textsubscript{{rs}} [sr\textsuperscript{{-1}}]}}$'
+    full_ax.set_xlabel(xlabel.replace(' ', '\ '), fontsize=20, labelpad=10)
+    full_ax.set_ylabel(ylabel.replace(' ', '\ '), fontsize=20, labelpad=30)
+    
+    site_labels_of_interest = ['WE2','WE6','WE13', 'Lake Erie St. 970','St. Andrews Bay (SA11)\nApr. 14, 2010','Pensacola Bay (PB09)\nAug. 26, 2011','Pensacola Bay (PB05)\nAug. 26, 2011','Pensacola Bay (PB04)\nAug. 26, 2011', 'Pensacola Bay (PB14)\nJun. 02, 2011','Pensacola Bay (PB08)\nJun. 02, 2011','Choctawhatchee Bay (CH01)\nJul. 30, 2011','Choctawhatchee Bay (CH03)\nJul. 30, 2011','WE4','WE8','Gulf_Mexico 72','Gulf_Mexico 82']
+
+    site_labels_of_interest_no_newline_dict = {
+    'WE2' : 'WE2',
+    'WE6' : 'WE6',
+    'WE13' : 'WE13',
+    'WE4' : 'WE4',
+    'WE8' : 'WE8',
+
+    'Lake Erie St. 970' : 'Lake Erie St. 970',
+    'St. Andrews Bay (SA11)\nApr. 14, 2010' : 'St. Andrews Bay (SA11)',
+    'Pensacola Bay (PB14)\nJun. 02, 2011' : 'Pensacola Bay (PB14)',
+    'Pensacola Bay (PB06)\nJun. 02, 2011' : 'Pensacola Bay (PB06)',
+    'Pensacola Bay (PB04)\nAug. 26, 2011' : 'Pensacola Bay (PB04)',
+    'Pensacola Bay (PB08)\nJun. 02, 2011' : 'Pensacola Bay (PB08)',
+    'Pensacola Bay (PB05)\nAug. 26, 2011' : 'Pensacola Bay (PB05)',
+
+    'Pensacola Bay (PB09)\nAug. 26, 2011' : 'Pensacola Bay (PB09)',
+    'Choctawhatchee Bay (CH01)\nJul. 30, 2011' : 'Choctawhatchee Bay (CH01)',
+    'Choctawhatchee Bay (CH03)\nJul. 30, 2011' : 'Choctawhatchee Bay (CH03)',
+    'Gulf_Mexico 72' : 'Gulf of Mexico 72',
+    'Gulf_Mexico 82' :'Gulf of Mexico 82',
+    }
+    import datetime as dt
+    def try_to_parse_date(input_text):
+        for fmt in ('[\'%Y%m%d %H:%M\']','[\'%Y-%m-%d %H:%M\']','[\'%Y%m%d\']'):
+            try:
+                return dt.datetime.strptime(input_text,fmt)
+            except ValueError:
+                pass
+        raise ValueError('No Valid date format found')
+
+    round_digits = 1
+
+
+    for plotting_label_current in site_labels_of_interest:
+        if plotting_label_current in dictionary_of_matchups['plotting_labels']:
+            index_of_plotting_label = np.where(plotting_label_current == dictionary_of_matchups['plotting_labels'])
+            index = index_of_plotting_label[0][0]
+        else:
+            print("NOT IN DICTIONARY")
+            continue
+
+        ax = axes[plt_idx]
+        first_row = plt_idx < n_col
+        last_row  = plt_idx >= ((n_row-1)*n_col)
+        first_col = (plt_idx % n_col) == 0
+        last_col  = ((plt_idx+1) % n_col) == 0
+
+        if not last_row:  ax.set_xticklabels([])
+        if not first_col: ax.set_yticklabels([])
+
+        chl_truth = round(np.asscalar(dictionary_of_matchups['chl'][index]),round_digits)
+        PC_truth = round(np.asscalar(dictionary_of_matchups['PC'][index]),round_digits)
+        chl_remote_estimate = round(np.asscalar(np.squeeze(np.asarray(y_remote_OG[0][:,:,y_remote_OG[1]["chl"]]))[index]),round_digits)
+        PC_remote_estimate = round(np.asscalar(np.squeeze(np.asarray(y_remote_OG[0][:,:,y_remote_OG[1]["pc"]]))[index]),round_digits)
+        chl_insitu_estimate = round(np.asscalar(np.squeeze(np.asarray(y_insitu_OG[0][:,:,y_insitu_OG[1]["chl"]]))[index]),round_digits)
+        PC_insitu_estimate = round(np.asscalar(np.squeeze(np.asarray(y_insitu_OG[0][:,:,y_insitu_OG[1]["pc"]]))[index]),round_digits)
+
+        text_label = fr'PC: {PC_truth}'+ '\n'  + fr'PC\textsuperscript{{e}}: {PC_insitu_estimate}' + '\n' + fr'PC\textsuperscript{{r}}: {PC_remote_estimate}'
+        text(0.9,0.905,text_label,horizontalalignment='center',verticalalignment='center',transform=ax.transAxes,backgroundcolor='1.0',bbox=dict(facecolor='white',edgecolor='black',boxstyle='round'),fontdict=font)
+        plot_label ='ABCDEFGHIJKLMNOPQRST'
+        text(0.03,0.96,plot_label[plt_idx],horizontalalignment='center',verticalalignment='center',transform=ax.transAxes,backgroundcolor='1.0',bbox=dict(facecolor='white',edgecolor='black',boxstyle='round'),fontdict=font)
+
+        insitu_Rrs = dictionary_of_matchups['insitu_Rrs_resampled_full'][index,:]
+        insitu_Rrs_wvl = dictionary_of_matchups['insitu_Rrs_resampled_wvl_full'][0,:]
+        retrieved_Rrs = dictionary_of_matchups['Rrs_retrieved_full'][index,:]
+        retrieved_Rrs_wvl = dictionary_of_matchups['Rrs_retrieved_wvl_full'][0,:]
+        site_label = dictionary_of_matchups['site_label'][index,:]
+        plotting_label = str(dictionary_of_matchups['plotting_labels'][index,:])
+
+        date_time = str(dictionary_of_matchups['insitu_datetime'][index,:])
+        reformatted_datetime = try_to_parse_date(date_time) 
+        reformatted_datetime = reformatted_datetime.strftime('%b, %d, %Y ')
+
+        ax.plot(insitu_Rrs_wvl,insitu_Rrs,'-o',color='b', alpha=0.4,label=fr'Rrs')
+        ax.plot(retrieved_Rrs_wvl,retrieved_Rrs,'-o',color='r', alpha=0.4,label=fr'\^{{R}}rs')
+        ax.set_ylim((0.0,0.025))
+        plotting_label = site_labels_of_interest_no_newline_dict[plotting_label_current]
+
+        title = fr'$\mathbf{{{{\large{{{plotting_label}}}}}}}$' + '\n' + fr'$\small{{{reformatted_datetime}}}$'
+        ax.tick_params(labelsize=20)
+        ax.grid('on', alpha=0.3)
+
+        ax.set_title(title.replace(' ', '\ '), fontsize=18)
+        filename = folder.joinpath(f'remote_vs_insitu_{run_name}_{products}_{sensor}.jpg')
+        plt.tight_layout()
+        plt_idx = plt_idx+1
+        if plt_idx ==1:
+            ax.legend(loc='upper center',fontsize=16)
+    plt.savefig(filename.as_posix(), dpi=600, bbox_inches='tight', pad_inches=0.1,)
+    plt.close()
+    
+    
+    #################3
+    #A third plot of aph
+    n_row = 5
+    n_col = 6
+    fig_size   = 5
+    plt_idx = 0
+    plt.rc('text', usetex=True)
+    plt.rcParams['mathtext.default']='regular'
+
+    fig, axes = plt.subplots(n_row, n_col, figsize=(fig_size*n_col, fig_size*n_row))
+    axes      = [ax for axs in np.atleast_1d(axes) for ax in np.atleast_1d(axs)]
+    colors    = ['xkcd:sky blue', 'xkcd:tangerine', 'xkcd:fresh green', 'xkcd:greyish blue', 'xkcd:goldenrod',  'xkcd:clay', 'xkcd:bluish purple', 'xkcd:reddish', 'xkcd:neon purple']
+
+    full_ax  = fig.add_subplot(111, frameon=False)
+    full_ax.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False, pad=10)
+
+    xlabel = fr'$\mathbf{{Band [nm]}}$'
+    ylabel = fr'$\mathbf{{a\textsubscript{{ph}} [m\textsuperscript{{-1}}]}}$'
+    full_ax.set_xlabel(xlabel.replace(' ', '\ '), fontsize=20, labelpad=10)
+    full_ax.set_ylabel(ylabel.replace(' ', '\ '), fontsize=20, labelpad=30) 
+    plt_idx=0
+    aph_resampled = dictionary_of_matchups['insitu_aph_resampled']
+    aph_wvl_resampled = dictionary_of_matchups['insitu_aph_resampled_wvl']
+    aph_wvl_resampled = aph_wvl_resampled[0,:]
+    
+    aph_remote_estimate = (np.squeeze(np.asarray(y_remote_OG[0][:,:,y_remote_OG[1]["aph"]]))[index])
+
+    current_product = 'aph'
+    bands  = np.array( get_sensor_bands(args.sensor, args) ) if args.use_HICO_aph == False and current_product == 'aph' else  np.array( get_sensor_bands('HICO-aph', args) ) if args.use_HICO_aph == True and current_product == 'aph' else  np.array( get_sensor_bands('HICO-adag', args) ) if args.use_HICO_aph == True and (current_product == 'ad' or current_product == 'ag') else np.array( get_sensor_bands(args.sensor, args) ) 
+    bands_ad_ag = np.array( get_sensor_bands('HICO-adag', args) )
+    for i in range(len(np.any(np.isnan(aph_resampled),axis=1))):
+        aph_remote_estimate =  np.squeeze(np.asarray(y_remote_OG[0][:,:,y_remote_OG[1]["aph"]]))[i]
+        aph_insitu_estimate =  np.squeeze(np.asarray(y_insitu_OG[0][:,:,y_insitu_OG[1]["aph"]]))[i]
+
+        ad_remote_estimate =  np.squeeze(np.asarray(y_remote_OG[0][:,:,y_remote_OG[1]["ad"]]))[i]
+        ad_insitu_estimate =  np.squeeze(np.asarray(y_insitu_OG[0][:,:,y_insitu_OG[1]["ad"]]))[i]
+        
+        ag_remote_estimate =  np.squeeze(np.asarray(y_remote_OG[0][:,:,y_remote_OG[1]["ag"]]))[i]
+        ag_insitu_estimate =  np.squeeze(np.asarray(y_insitu_OG[0][:,:,y_insitu_OG[1]["ag"]]))[i]
+
+        
+        if np.any(np.isnan(aph_resampled),axis=1)[i] or np.any(np.isnan(aph_remote_estimate)): continue
+        ax = axes[plt_idx]
+        ax.plot(aph_wvl_resampled,aph_resampled[i,:], 'k')
+        ax.plot(bands,aph_insitu_estimate,'g')
+        ax.plot(bands,aph_remote_estimate,'r')
+        ax.set_ylim([0,0.7])
+        ax2=ax.twinx()
+        ax2.plot(bands_ad_ag,ad_remote_estimate,'b-')
+        ax2.plot(bands_ad_ag,ad_insitu_estimate,'b.')
+        ax2.plot(bands_ad_ag,ag_remote_estimate,'m-')
+        ax2.plot(bands_ad_ag,ag_insitu_estimate,'m.')
+        ax2.set_ylim([0,1.5])
+        ax.set_title(dictionary_of_matchups['plotting_labels'][i][0].replace('_',''))
+        plt_idx=plt_idx+1
+        if plt_idx < 24: ax.set_xticks([])
+    plt.tight_layout()
+    plt.show()
+    plt.tight_layout()
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
