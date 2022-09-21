@@ -1084,6 +1084,7 @@ def plot_remote_insitu(y_remote, y_insitu, dictionary_of_matchups=None, products
         PC_truth = round(np.asscalar(dictionary_of_matchups['PC'][index]),round_digits)
         chl_remote_estimate = round(np.asscalar(np.squeeze(np.asarray(y_remote_OG[0][:,:,y_remote_OG[1]["chl"]]))[index]),round_digits)
         PC_remote_estimate = round(np.asscalar(np.squeeze(np.asarray(y_remote_OG[0][:,:,y_remote_OG[1]["pc"]]))[index]),round_digits)
+
         chl_insitu_estimate = round(np.asscalar(np.squeeze(np.asarray(y_insitu_OG[0][:,:,y_insitu_OG[1]["chl"]]))[index]),round_digits)
         PC_insitu_estimate = round(np.asscalar(np.squeeze(np.asarray(y_insitu_OG[0][:,:,y_insitu_OG[1]["pc"]]))[index]),round_digits)
 
@@ -1123,9 +1124,9 @@ def plot_remote_insitu(y_remote, y_insitu, dictionary_of_matchups=None, products
     
     
     #################3
-    #A third plot of aph
-    n_row = 5
-    n_col = 6
+    #A third plot of aph, ag, and ad
+    n_row = 2
+    n_col = 4
     fig_size   = 5
     plt_idx = 0
     plt.rc('text', usetex=True)
@@ -1140,47 +1141,116 @@ def plot_remote_insitu(y_remote, y_insitu, dictionary_of_matchups=None, products
 
     xlabel = fr'$\mathbf{{Band [nm]}}$'
     ylabel = fr'$\mathbf{{a\textsubscript{{ph}} [m\textsuperscript{{-1}}]}}$'
+    ylabel_ad_ag = fr'$\mathbf{{a\textsubscript{{d}} | a\textsubscript{{g}} [m\textsuperscript{{-1}}]}}$'
+
     full_ax.set_xlabel(xlabel.replace(' ', '\ '), fontsize=20, labelpad=10)
-    full_ax.set_ylabel(ylabel.replace(' ', '\ '), fontsize=20, labelpad=30) 
+    # full_ax.set_ylabel(ylabel.replace(' ', '\ '), fontsize=20, labelpad=30) 
+    # full_ax2 = full_ax.twinx()
+    # full_ax2.set_ylabel(ylabel.replace(' ', '\ '), fontsize=20, labelpad=30) 
+    # full_ax.set_ylabel(ylabel.replace(' ', '\ '), fontsize=20, labelpad=30) 
+
     plt_idx=0
     aph_resampled = dictionary_of_matchups['insitu_aph_resampled']
     aph_wvl_resampled = dictionary_of_matchups['insitu_aph_resampled_wvl']
     aph_wvl_resampled = aph_wvl_resampled[0,:]
+    
+    ad_resampled = dictionary_of_matchups['insitu_ad_resampled']
+    ad_wvl_resampled = dictionary_of_matchups['insitu_ad_resampled_wvl']
+    ad_wvl_resampled = ad_wvl_resampled[0,:]
+    
+    ag_resampled = dictionary_of_matchups['insitu_ag_resampled']
+    ag_wvl_resampled = dictionary_of_matchups['insitu_ag_resampled_wvl']
+    ag_wvl_resampled = ag_wvl_resampled[0,:]
     
     aph_remote_estimate = (np.squeeze(np.asarray(y_remote_OG[0][:,:,y_remote_OG[1]["aph"]]))[index])
 
     current_product = 'aph'
     bands  = np.array( get_sensor_bands(args.sensor, args) ) if args.use_HICO_aph == False and current_product == 'aph' else  np.array( get_sensor_bands('HICO-aph', args) ) if args.use_HICO_aph == True and current_product == 'aph' else  np.array( get_sensor_bands('HICO-adag', args) ) if args.use_HICO_aph == True and (current_product == 'ad' or current_product == 'ag') else np.array( get_sensor_bands(args.sensor, args) ) 
     bands_ad_ag = np.array( get_sensor_bands('HICO-adag', args) )
-    for i in range(len(np.any(np.isnan(aph_resampled),axis=1))):
-        aph_remote_estimate =  np.squeeze(np.asarray(y_remote_OG[0][:,:,y_remote_OG[1]["aph"]]))[i]
-        aph_insitu_estimate =  np.squeeze(np.asarray(y_insitu_OG[0][:,:,y_insitu_OG[1]["aph"]]))[i]
+    counter = 0
+    site_labels_of_interest = ['St. Andrews Bay (SA11)\nApr. 14, 2010','Pensacola Bay (PB09)\nAug. 26, 2011','Pensacola Bay (PB05)\nAug. 26, 2011','Pensacola Bay (PB04)\nAug. 26, 2011'] #, 'Pensacola Bay (PB14)\nJun. 02, 2011','Pensacola Bay (PB08)\nJun. 02, 2011','Choctawhatchee Bay (CH01)\nJul. 30, 2011','Choctawhatchee Bay (CH03)\nJul. 30, 2011','WE4','WE8','Gulf_Mexico 72','Gulf_Mexico 82'
+    site_labels_of_interest_2 = ['Pensacola Bay (PB14)\nJun. 02, 2011','Pensacola Bay (PB08)\nJun. 02, 2011','Choctawhatchee Bay (CH01)\nJul. 30, 2011','Choctawhatchee Bay (CH03)\nJul. 30, 2011']
 
-        ad_remote_estimate =  np.squeeze(np.asarray(y_remote_OG[0][:,:,y_remote_OG[1]["ad"]]))[i]
-        ad_insitu_estimate =  np.squeeze(np.asarray(y_insitu_OG[0][:,:,y_insitu_OG[1]["ad"]]))[i]
+    i = []
+    for plotting_label_current in site_labels_of_interest:
+        if plotting_label_current in dictionary_of_matchups['plotting_labels']:
+            index_of_plotting_label = np.where(plotting_label_current == dictionary_of_matchups['plotting_labels'])
+            index = index_of_plotting_label[0][0]
+        else:
+            print("NOT IN DICTIONARY")
+            continue
         
-        ag_remote_estimate =  np.squeeze(np.asarray(y_remote_OG[0][:,:,y_remote_OG[1]["ag"]]))[i]
-        ag_insitu_estimate =  np.squeeze(np.asarray(y_insitu_OG[0][:,:,y_insitu_OG[1]["ag"]]))[i]
+        if plt_idx > 3: continue
+        cdom_remote_estimate = round(np.asscalar(np.squeeze(np.asarray(y_remote_OG[0][:,:,y_remote_OG[1]["cdom"]]))[index]),round_digits)
+        cdom_insitu_estimate = round(np.asscalar(np.squeeze(np.asarray(y_insitu_OG[0][:,:,y_insitu_OG[1]["cdom"]]))[index]),round_digits)
+
+        aph_remote_estimate =  np.squeeze(np.asarray(y_remote_OG[0][:,:,y_remote_OG[1]["aph"]]))[index]
+        aph_insitu_estimate =  np.squeeze(np.asarray(y_insitu_OG[0][:,:,y_insitu_OG[1]["aph"]]))[index]
+
+        ad_remote_estimate =  np.squeeze(np.asarray(y_remote_OG[0][:,:,y_remote_OG[1]["ad"]]))[index]
+        ad_insitu_estimate =  np.squeeze(np.asarray(y_insitu_OG[0][:,:,y_insitu_OG[1]["ad"]]))[index]
+        
+        ag_remote_estimate =  np.squeeze(np.asarray(y_remote_OG[0][:,:,y_remote_OG[1]["ag"]]))[index]
+        ag_insitu_estimate =  np.squeeze(np.asarray(y_insitu_OG[0][:,:,y_insitu_OG[1]["ag"]]))[index]
 
         
-        if np.any(np.isnan(aph_resampled),axis=1)[i] or np.any(np.isnan(aph_remote_estimate)): continue
+        if np.any(np.isnan(aph_resampled),axis=1)[index] or np.any(np.isnan(aph_remote_estimate)): continue
         ax = axes[plt_idx]
-        ax.plot(aph_wvl_resampled,aph_resampled[i,:], 'k')
-        ax.plot(bands,aph_insitu_estimate,'g')
-        ax.plot(bands,aph_remote_estimate,'r')
-        ax.set_ylim([0,0.7])
-        ax2=ax.twinx()
-        ax2.plot(bands_ad_ag,ad_remote_estimate,'b-')
-        ax2.plot(bands_ad_ag,ad_insitu_estimate,'b.')
-        ax2.plot(bands_ad_ag,ag_remote_estimate,'m-')
-        ax2.plot(bands_ad_ag,ag_insitu_estimate,'m.')
-        ax2.set_ylim([0,1.5])
-        ax.set_title(dictionary_of_matchups['plotting_labels'][i][0].replace('_',''))
+        ax.plot(aph_wvl_resampled,aph_resampled[index,:], 'k',label='Measured')
+        ax.plot(bands,aph_insitu_estimate,'g',label=fr'$\mathit{{In \ situ}}$')
+        ax.plot(bands,aph_remote_estimate,'r',label='Remote')
+        ax.set_ylim([0,0.5])
+        ax.set_xlim([400,700])
+        ax.grid()
+        ax.set_xticklabels([])
+        if plt_idx == 0: 
+            ax.legend()
+            ax.set_ylabel(ylabel.replace(' ', '\ '), fontsize=20, labelpad=30) 
+        else:
+            ax.set_xticklabels([])
+            ax.set_yticklabels([])
+
+        #ax2=ax.twinx()
+        plt_idx_2=plt_idx+n_col
+
+
+        ax2 = axes[plt_idx_2]
+        ax2.plot(ad_wvl_resampled,ad_resampled[index,:], 'k',label=fr'$a\textsubscript{{d}}$')
+        ax2.plot(ag_wvl_resampled,ag_resampled[index,:], 'k-.',label=fr'$a\textsubscript{{g}}$')
+        
+        ax2.plot(bands_ad_ag,ad_remote_estimate,'r')
+        ax2.plot(bands_ad_ag,ag_remote_estimate,'r-.')
+        ag_measurement=dictionary_of_matchups['cdom'][index][0]
+        ax2.plot(443,ag_measurement,'k.',markersize=12,label=fr'$cdom\textsubscript{{443}}$')
+        ax2.plot(443,cdom_remote_estimate,'r.',markersize=12)
+        ax2.plot(443,cdom_insitu_estimate,'g.',markersize=12)
+
+        ax2.plot(bands_ad_ag,ad_insitu_estimate,'g')
+        ax2.plot(bands_ad_ag,ag_insitu_estimate,'g-.')
+        
+
+        if plt_idx_2 == n_col: 
+            ax2.legend()
+            ax2.set_ylabel(ylabel_ad_ag.replace(' ', '\ '), fontsize=20, labelpad=30) 
+        else:
+            ax2.set_yticklabels([])
+            
+
+        ax2.set_ylim([0,1])
+        ax2.set_xlim([400,700])
+        ax2.grid()
+
+        ax.set_title(dictionary_of_matchups['plotting_labels'][index][0].replace('_',''))
         plt_idx=plt_idx+1
-        if plt_idx < 24: ax.set_xticks([])
+        # if plt_idx < 24: ax.set_xticks([])
+        counter = counter+1
+       
     plt.tight_layout()
+    filename = folder.joinpath(f'pb_matchups_1_{run_name}_{products}_{sensor}.jpg')
+    plt.savefig(filename.as_posix(), dpi=400, bbox_inches='tight', pad_inches=0.1,)
+
     plt.show()
-    plt.tight_layout()
+    
 
     
     

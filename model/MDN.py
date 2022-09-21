@@ -136,7 +136,7 @@ class MDN:
 			use_gpu : bool, optional (default=False)
 				Use the GPU to generate estimates if True, otherwise use the CPU.
 			 '''
-		with tf.device('/gpu:0' if use_gpu else '/cpu:0'):
+		with tf.device('/cpu:0'):
 
 			model_out = self.model( self.scalerx.transform(ensure_format(X)) )
 			coefs_out = self.get_coefs(model_out)

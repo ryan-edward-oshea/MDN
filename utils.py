@@ -405,10 +405,15 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_boo
             #print('Name', name)
             #required_wvl = [443, 530, 690,]
             #required_wvl = [409, 415, 421, 426, 432, 438, 444, 449, 455, 461, 467, 472, 478, 484, 490, 495, 501, 507, 512, 518, 524, 530, 535, 541, 547, 553, 558, 564, 570, 575, 581, 587, 593, 598, 604, 610,616, 621,627, 633, 638, 644, 650, 656, 661,]#get_sensor_bands('OLCI-IOP', args)
-            if args.use_HICO_aph: required_wvl =  get_sensor_bands('HICO-aph', args)#[409, 421, 432, 444, 455, 467, 478, 490, 501, 512, 524, 535, 547, 558, 570, 581, 593, 604, 616, 621, 633, 644, 650, 656, 667, 673, 679, 684, 690, 701, 713, 724,],
+            if args.use_HICO_aph: 
+                if 'HICO' in args.sensor: required_wvl =  get_sensor_bands('HICO-aph', args)#[409, 421, 432, 444, 455, 467, 478, 490, 501, 512, 524, 535, 547, 558, 570, 581, 593, 604, 616, 621, 633, 644, 650, 656, 667, 673, 679, 684, 690, 701, 713, 724,],
+                if 'PRISMA' in args.sensor: required_wvl =  get_sensor_bands('PRISMA-aph', args)#[409, 421, 432, 444, 455, 467, 478, 490, 501, 512, 524, 535, 547, 558, 570, 581, 593, 604, 616, 621, 633, 644, 650, 656, 667, 673, 679, 684, 690, 701, 713, 724,],
+
         if 'ag' in name or 'ad' in name:
-             if args.use_HICO_aph: required_wvl = get_sensor_bands('HICO-adag', args) #[443, 490, 547, 593, 644,]
-                        
+             if args.use_HICO_aph: 
+                 if 'HICO' in args.sensor:  required_wvl = get_sensor_bands('HICO-adag', args) #[443, 490, 547, 593, 644,]
+                 if 'PRIISMA' in args.sensor:  required_wvl = get_sensor_bands('PRISMA-adag', args) #[443, 490, 547, 593, 644,]
+
         try:
             required_wvl = np.array(required_wvl).flatten()
             assert(dloc.exists()), (f'Key {name} does not exist at {loc} ({dloc})') 
@@ -571,7 +576,7 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_boo
     return x_data, y_data, slices, l_data
 
 
-def _filter_invalid(x_data, y_data, slices, allow_nan_inp=False, allow_nan_out=False, other=[]):
+def _filter_invalid(x_data, y_data, slices, allow_nan_inp=False, allow_nan_out=False, other=[], min_in_out_val = 0):
     ''' 
     Filter the given data to only include samples which are valid. By 
     default, valid samples include all which are not nan, and greater 
@@ -615,7 +620,7 @@ def _filter_invalid(x_data, y_data, slices, allow_nan_inp=False, allow_nan_out=F
     for i, fullset in enumerate(both_data):
         for subset in fullset:
             subset[np.isnan(subset)] = -999.
-            subset[np.logical_or(subset <= 0, not i and (subset >= 10))] = np.nan 
+            subset[np.logical_or(subset <= min_in_out_val, not i and (subset >= 10))] = np.nan 
             has_nan = np.any if (i and allow_nan_out) or (not i and allow_nan_inp) else np.all 
             valid   = np.logical_and(valid, has_nan(np.isfinite(subset), 1))
 
@@ -660,8 +665,8 @@ def get_data(args):
             safe_prod = product.replace('*', '[*]') # Prevent glob from getting confused by wildcard
             datasets  = [get_dataset(path, product) for path in data_path.glob(f'*/{sensor}/{safe_prod}.csv')]
 
-            #if product == 'aph':PACE data may be slightly off.
-            #    datasets = [d for d in datasets if d not in ['PACE']]
+#            if product == 'aph':PACE data may be slightly off.
+            if args.removed_dataset is not None : datasets = [d for d in datasets if  d not in args.removed_dataset.split(',')]
             
             if getattr(args, 'subset', ''):
                 datasets = [d for d in datasets if d in args.subset.split(',')]
@@ -700,9 +705,9 @@ def get_data(args):
 
     # if -nan IS in the sensor label: do not filter samples; allow all, regardless of nan composition
     if 'latlon' in args.product.split(','): 
-        (x_data, *_), (y_data, *_), (sources, latlons) = _filter_invalid(x_data, y_data[:,:-1].astype(float) if 'latlon' in args.product.split(',') else y_data, slices, other=[sources,y_data[:,-1]] if 'latlon' in args.product.split(',') else [sources] ,allow_nan_inp= args.allow_nan_inp or '-nan'  in args.sensor, allow_nan_out= args.allow_nan_out)
+        (x_data, *_), (y_data, *_), (sources, latlons) = _filter_invalid(x_data, y_data[:,:-1].astype(float) if 'latlon' in args.product.split(',') else y_data, slices, other=[sources,y_data[:,-1]] if 'latlon' in args.product.split(',') else [sources] ,allow_nan_inp= args.allow_nan_inp or '-nan'  in args.sensor, allow_nan_out= args.allow_nan_out,min_in_out_val=args.min_in_out_val)
     else:
-        (x_data, *_), (y_data, *_), (sources, *_) = _filter_invalid(x_data, y_data[:,:-1].astype(float) if 'latlon' in args.product.split(',') else y_data, slices, other=[sources,y_data[:,-1]] if 'latlon' in args.product.split(',') else [sources] ,allow_nan_inp= args.allow_nan_inp or '-nan'  in args.sensor, allow_nan_out= args.allow_nan_out)
+        (x_data, *_), (y_data, *_), (sources, *_) = _filter_invalid(x_data, y_data[:,:-1].astype(float) if 'latlon' in args.product.split(',') else y_data, slices, other=[sources,y_data[:,-1]] if 'latlon' in args.product.split(',') else [sources] ,allow_nan_inp= args.allow_nan_inp or '-nan'  in args.sensor, allow_nan_out= args.allow_nan_out,min_in_out_val=args.min_in_out_val)
 
     print('\nFinal counts:')
     print('\n'.join([f'\tN={num:>5} | {loc}' for loc, num in zip(*np.unique(sources[:, 0], return_counts=True))]))
@@ -793,6 +798,20 @@ def assemble_resampled_matchups(sensor,matchup_folder_name,bands):
 	aph_insitu_resampled_wvl =  pd.DataFrame(pd.read_csv(matchup_folder_name + '/' + sensor + '/aph_wvl.csv',header=None))
 	aph_insitu_resampled_wvl = aph_insitu_resampled_wvl.values
     
+	ad_insitu_resampled = pd.read_csv(matchup_folder_name + '/' + sensor + '/ad.csv',header=None)
+	ad_insitu_resampled = pd.DataFrame(ad_insitu_resampled)
+	ad_insitu_resampled = ad_insitu_resampled.values
+    
+	ad_insitu_resampled_wvl =  pd.DataFrame(pd.read_csv(matchup_folder_name + '/' + sensor + '/ad_wvl.csv',header=None))
+	ad_insitu_resampled_wvl = ad_insitu_resampled_wvl.values
+
+	ag_insitu_resampled = pd.read_csv(matchup_folder_name + '/' + sensor + '/ag.csv',header=None)
+	ag_insitu_resampled = pd.DataFrame(ag_insitu_resampled)
+	ag_insitu_resampled = ag_insitu_resampled.values
+    
+	ag_insitu_resampled_wvl =  pd.DataFrame(pd.read_csv(matchup_folder_name + '/' + sensor + '/ag_wvl.csv',header=None))
+	ag_insitu_resampled_wvl = ag_insitu_resampled_wvl.values
+    
 	Rrs_insitu_resampled_full = Rrs_insitu_resampled[:,return_valid_wavelengths(desired_wavelengths=get_sensor_bands(sensor+'-noNIR_LB'),available_wavelengths=Rrs_insitu_resampled_wvl)]
 	Rrs_insitu_resampled_full_NIR = Rrs_insitu_resampled[:,return_valid_wavelengths(desired_wavelengths=get_sensor_bands(sensor+'-SimisFull'),available_wavelengths=Rrs_insitu_resampled_wvl)]
 	valid_wavelength_bool = return_valid_wavelengths(desired_wavelengths=get_sensor_bands(sensor+'-SimisFull'),available_wavelengths=Rrs_insitu_resampled_wvl)
@@ -803,7 +822,9 @@ def assemble_resampled_matchups(sensor,matchup_folder_name,bands):
 		print('PRINTING SHAPE OF 0: ', np.shape(Rrs_insitu_resampled_full_NIR))
 	Rrs_insitu_resampled = Rrs_insitu_resampled[:,return_valid_wavelengths(desired_wavelengths=bands,available_wavelengths=Rrs_insitu_resampled_wvl)]
 	aph_insitu_resampled = aph_insitu_resampled[:,return_valid_wavelengths(desired_wavelengths=bands,available_wavelengths=aph_insitu_resampled_wvl)]
-    
+	ag_insitu_resampled = ag_insitu_resampled[:,return_valid_wavelengths(desired_wavelengths=bands,available_wavelengths=ag_insitu_resampled_wvl)]
+	ad_insitu_resampled = ad_insitu_resampled[:,return_valid_wavelengths(desired_wavelengths=bands,available_wavelengths=ad_insitu_resampled_wvl)]
+
 	def recover_values(matchup_folder_name,desired_value):
 		if desired_value == 'Rrs_retrieved':
 			desired_product_df = pd.read_csv(matchup_folder_name + '/' + desired_value + '.csv')
@@ -819,7 +840,7 @@ def assemble_resampled_matchups(sensor,matchup_folder_name,bands):
 		desired_product_columns = desired_product_df.columns
 		return desired_product_columns
 
-	products = ['chl','PC','dataset','insitu_datetime','path','Rrs_retrieved','site_label','plotting_labels','lat','lon']
+	products = ['chl','PC','dataset','insitu_datetime','path','Rrs_retrieved','site_label','plotting_labels','lat','lon','cdom']
 	dict_of_product_vals=dict() 
 	dict_of_product_vals['insitu_Rrs_resampled'] = Rrs_insitu_resampled
 	dict_of_product_vals['insitu_Rrs_resampled_full'] = Rrs_insitu_resampled_full
@@ -828,6 +849,11 @@ def assemble_resampled_matchups(sensor,matchup_folder_name,bands):
 	dict_of_product_vals['insitu_aph_resampled'] = aph_insitu_resampled
 	dict_of_product_vals['insitu_aph_resampled_wvl'] = np.transpose(aph_insitu_resampled_wvl[return_valid_wavelengths(desired_wavelengths=bands,available_wavelengths=aph_insitu_resampled_wvl)])
 
+	dict_of_product_vals['insitu_ad_resampled'] = ad_insitu_resampled
+	dict_of_product_vals['insitu_ad_resampled_wvl'] = np.transpose(ad_insitu_resampled_wvl[return_valid_wavelengths(desired_wavelengths=bands,available_wavelengths=ad_insitu_resampled_wvl)])
+
+	dict_of_product_vals['insitu_ag_resampled'] = ag_insitu_resampled
+	dict_of_product_vals['insitu_ag_resampled_wvl'] = np.transpose(ag_insitu_resampled_wvl[return_valid_wavelengths(desired_wavelengths=bands,available_wavelengths=ag_insitu_resampled_wvl)])
 
 	if return_valid_wavelengths(desired_wavelengths=bands,available_wavelengths=Rrs_insitu_resampled_wvl).any() == False or return_valid_wavelengths(desired_wavelengths=bands,available_wavelengths=Rrs_insitu_resampled_wvl).any() == False:
 		print(return_valid_wavelengths(desired_wavelengths=bands,available_wavelengths=Rrs_insitu_resampled_wvl))

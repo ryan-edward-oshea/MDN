@@ -14,7 +14,7 @@ parser.add_argument("--data_loc",  default="/home/ryanoshea/in_situ_database/Wor
 parser.add_argument("--sim_loc",   default="D:/Data/Simulated", help="Location of simulated data")
 parser.add_argument("--n_redraws", default=50,     type=int,   help="Number of plot redraws during training (i.e. updates plot every n_iter / n_redraws iterations); only used with --plot_loss.")
 parser.add_argument("--n_rounds",  default=1,     type=int,   help="Number of models to fit, with median output as the final estimate")
-parser.add_argument("--use_gpu",  default=True,     type=int,   help="Uses GPU during predictions")
+parser.add_argument("--use_gpu",  default=False,     type=int,   help="Uses GPU during predictions")
 parser.add_argument("--use_HICO_aph",  default=False,     type=int,   help="Uses GPU during predictions")
 
 ''' Flags '''
@@ -47,6 +47,10 @@ update.add_argument("--allow_missing",    default=False,           help="Allows 
 update.add_argument("--allow_nan_inp",    default=False,           help="Allows 0 or - Rrs")
 update.add_argument("--allow_nan_out",    default=True,           help="Allows nans in the output products")
 update.add_argument("--filter_ad_ag",    default=False,           help="Filters ag/ag based on fit to exponential")
+#change the input dataset allowed
+update.add_argument("--removed_dataset",    default=None,           help="Removes specific dataset prior to training")
+update.add_argument("--min_in_out_val",    default=0,           help="Removes input/output below this value to reduce Cholesk Decomposition failure error")
+
 
 
 ''' Flags which have a yet undecided default value '''

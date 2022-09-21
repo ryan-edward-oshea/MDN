@@ -51,7 +51,7 @@ def get_estimates(args, x_train=None, y_train=None, x_test=None, y_test=None, ou
         'threshold'           : getattr(args, 'threshold', None),
         'confidence_interval' : getattr(args, 'CI', None),
         'use_gpu'             : getattr(args, 'use_gpu', False),
-        'chunk_size'          : getattr(args, 'chunk_size', 1e5),
+        'chunk_size'          : getattr(args, 'chunk_size', 1e3),
         'return_coefs'        : True,
     }
 
@@ -224,10 +224,10 @@ def generate_estimates(args, bands, x_train, y_train, x_test, y_test, slices, lo
 
 def main(kwargs):
     args = get_args(kwargs,use_cmdline=False)
-    if True:
+    if False:
         import pickle
 
-        # # # args.no_load=False
+        # # args.no_load=False
         # dictionary_of_matchups = get_matchups(args.sensor)    
         # # print(dictionary_of_matchups.keys())
         # # print(dictionary_of_matchups['site_label'])
@@ -408,7 +408,7 @@ def main(kwargs):
         # print(aph_truths_sorted_accuracy)
 
 
-        labels     = get_labels(bands, slices, y_test.shape[1], wavelengths_ad_ag= get_sensor_bands('HICO-adag', args) if args.use_HICO_aph else None, wavelengths_aph=get_sensor_bands('HICO-aph', args) if args.use_HICO_aph else None,use_HICO_aph=args.use_HICO_aph) #get_labels(get_sensor_bands('HICO-aph', args) if args.use_HICO_aph else bands, slices, y_test.shape[1])
+        labels     = get_labels(bands, slices, y_test.shape[1], wavelengths_ad_ag= get_sensor_bands('PRISMA-adag', args) if args.use_HICO_aph else None, wavelengths_aph=get_sensor_bands('PRISMA-aph', args) if args.use_HICO_aph else None,use_HICO_aph=args.use_HICO_aph) #get_labels(get_sensor_bands('HICO-aph', args) if args.use_HICO_aph else bands, slices, y_test.shape[1])
         products   = args.product.split(',')
         args.summary_stats = {}
         #Split by product
