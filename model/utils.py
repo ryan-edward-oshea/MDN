@@ -28,4 +28,4 @@ def get_device(model_config):
 	gpus = tf.config.list_physical_devices('GPU')
 	cpus = tf.config.list_physical_devices('CPU')
 	name = (gpus+cpus)[0].name.replace('physical_device:', '')
-	return tf.device('/cpu:0')#  name) #
+	return tf.device(name) #'/cpu:0')#  

@@ -412,7 +412,7 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_boo
         if 'ag' in name or 'ad' in name:
              if args.use_HICO_aph: 
                  if 'HICO' in args.sensor:  required_wvl = get_sensor_bands('HICO-adag', args) #[443, 490, 547, 593, 644,]
-                 if 'PRIISMA' in args.sensor:  required_wvl = get_sensor_bands('PRISMA-adag', args) #[443, 490, 547, 593, 644,]
+                 if 'PRISMA' in args.sensor:  required_wvl = get_sensor_bands('PRISMA-adag', args) #[443, 490, 547, 593, 644,]
 
         try:
             required_wvl = np.array(required_wvl).flatten()
@@ -902,3 +902,75 @@ def get_matchups(sensor):
 				for key in dict_of_product_vals.keys():
 					dict_of_product_vals[key] = np.concatenate((dict_of_product_vals[key],(dict_of_product_vals_current[key])))
 	return dict_of_product_vals
+
+
+import math 
+import numpy as np
+from MDN.metrics import mdsa
+
+def calc_spectral_slope(wavelengths,sample,reference_wavelength=443,min_wavelength=430,max_wavelength=650,slope_min_bound=0.005,slope_max_bound=0.03,allowed_error=10):
+    from scipy.optimize import curve_fit
+    wavelengths=np.array(wavelengths)
+    sample=np.array(sample)
+    wavelengths_OG = wavelengths
+    sample_OG = sample
+    
+    exponential = lambda x, a, b: a * np.exp(-b*x) #, c +  c , remove offset to match SEM from twardowski 2004..
+
+    above_min = wavelengths>min_wavelength
+    below_max = wavelengths<max_wavelength
+    is_finite = np.isfinite(sample) 
+    valid = below_max*above_min*is_finite
+    sample = sample[valid]
+
+    wavelengths_OG = wavelengths
+    wavelengths = wavelengths[valid]
+
+    if len(sample):
+        if np.all(np.isfinite(sample)) and np.min(sample) > -0.1  :
+                try:
+                        #print("Index",index,sample)
+                     x = np.array(wavelengths) - reference_wavelength#np.min(wavelengths)
+                     #print(x,sample) #bounds for NAP should be different, Up to 0.1 atleast... .0005 --> .020, similar for CDOM... .008 - .02 .0123 -ocean optics web book models geochemistry
+                     params, _  = curve_fit(exponential, x, sample, p0=(1,0.018),bounds=((1e-3, slope_min_bound), (6e1, slope_max_bound))) #(1,0.01,0),bounds=((1e-3, 4e-3, 0), (1e2, 3e-1, 1e-1)))
+                     new_sample = exponential(x, *params)
+                     if mdsa(sample[None,:], new_sample[None,:]) > allowed_error:
+                         params = [np.nan,np.nan,np.nan]
+
+                     #print(params)
+                        #print(wavelengths_OG, sample, wavelengths,new_sample)
+                     return [wavelengths_OG, sample_OG, wavelengths,new_sample,params,sample]
+                except: 
+                        #print('Could not fit exponential')
+                        return [wavelengths_OG, sample_OG,np.nan,np.nan,[np.nan,np.nan,np.nan],sample]
+    else:
+        #print("Invalid sample")
+        return [wavelengths_OG, sample_OG,np.nan,np.nan,[np.nan,np.nan,np.nan],sample]
+    
+    
+    
+def convert_point_slope_to_spectral_cdom(CDOM,SCDOM,desired_wavelengths,reference_CDOM_wavelength=443):
+    return [CDOM*math.exp(-SCDOM * (wavelength-reference_CDOM_wavelength)) for wavelength in desired_wavelengths ] 
+    
+
+
+#Takes in available points and wavelengths and calculates point aand slope at 440 nm
+def convert_spectral_cdom_to_point_slope(wavelengths,spectral_CDOM,reference_CDOM_wavelength=443,spectral_min_max=[430,640],allowed_error = 10):
+    #Find all wavelengths in the spectral min/max region
+    wavelengths = list(wavelengths)
+    spectral_CDOM = list(spectral_CDOM)
+    bounded_wavelengths = [wavelength for wavelength in wavelengths if wavelength<max(spectral_min_max) and wavelength > min(spectral_min_max)]
+    bounded_spectral_CDOM =  [spectral_CDOM[wavelengths.index(bounded_wavelength)] for bounded_wavelength in bounded_wavelengths]
+    
+    #Calculate slope
+    S_CDOM_min = 0.005 #https://www.oceanopticsbook.info/view/optical-constituents-of-the-ocean/level-2/commonly-used-models-for-iops-and-biogeochemistry
+    S_CDOM_max = 0.030
+    wavelengths_OG, sample_OG, wavelengths_new,new_sample, params, sample_resized = calc_spectral_slope(wavelengths=bounded_wavelengths,sample=bounded_spectral_CDOM,reference_wavelength=reference_CDOM_wavelength,min_wavelength= min(spectral_min_max),max_wavelength=max(spectral_min_max) ,slope_min_bound=S_CDOM_min,slope_max_bound=S_CDOM_max,allowed_error=allowed_error)
+    CDOM = params[0]
+    SCDOM = params[1]
+    
+    return np.round(CDOM,2),np.round(SCDOM,4)
+    #identifies the nearest wavelength, interpolating if necesary
+
+
+

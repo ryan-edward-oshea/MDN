@@ -222,9 +222,9 @@ def generate_estimates(args, bands, x_train, y_train, x_test, y_test, slices, lo
     return benchmarks
 
 
-def main(kwargs):
+def main(kwargs,plot_matchups=False):
     args = get_args(kwargs,use_cmdline=False)
-    if False:
+    if plot_matchups:
         import pickle
 
         # # args.no_load=False
@@ -408,7 +408,7 @@ def main(kwargs):
         # print(aph_truths_sorted_accuracy)
 
 
-        labels     = get_labels(bands, slices, y_test.shape[1], wavelengths_ad_ag= get_sensor_bands('PRISMA-adag', args) if args.use_HICO_aph else None, wavelengths_aph=get_sensor_bands('PRISMA-aph', args) if args.use_HICO_aph else None,use_HICO_aph=args.use_HICO_aph) #get_labels(get_sensor_bands('HICO-aph', args) if args.use_HICO_aph else bands, slices, y_test.shape[1])
+        labels     = get_labels(bands, slices, y_test.shape[1], wavelengths_ad_ag= get_sensor_bands(f'{args.sensor}-adag', args) if args.use_HICO_aph else None, wavelengths_aph=get_sensor_bands(f'{args.sensor}-aph', args) if args.use_HICO_aph else None,use_HICO_aph=args.use_HICO_aph) #get_labels(get_sensor_bands('HICO-aph', args) if args.use_HICO_aph else bands, slices, y_test.shape[1])
         products   = args.product.split(',')
         args.summary_stats = {}
         #Split by product
@@ -437,5 +437,5 @@ def main(kwargs):
 
 
         products   = args.product.split(',') 
-        # plot_histogram(y_data,products,slices,locs)
+        plot_histogram(y_data,products,slices,locs)
         get_estimates(args, x_data, y_data, output_slices=slices, dataset_labels=locs[:,0])

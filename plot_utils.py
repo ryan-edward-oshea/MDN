@@ -333,22 +333,22 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
     # Only plot certain bands
     if len(labels) > 3 :
         product_bands = {
-            'default' :  [443,482,561,655] if 'OLI'  in sensor else [443,490,560,620,673,710]  if 'OLCI' in sensor  else [443,530,620,673,]  if args.use_HICO_aph  else  [409,443,478,535,620,673,690,724]  #[415,443,490,501,550,620,673,690] #[443,482,561,655]
+            'default' :  [443,482,561,655] if 'OLI'  in sensor else [443,490,560,620,673,710]  if 'OLCI' in sensor  else [443,620,673,]  if args.use_HICO_aph  else  [409,443,478,535,620,673,690,724]  #[415,443,490,501,550,620,673,690] #[443,482,561,655]
             # 'aph'     : [443, 530], [409, 421, 432, 444, 455, 467, 478, 490, 501, 512, 524, 535, 547, 558, 570, 581, 593, 604, 616, 621, 633, 644, 650, 656, 667, 673, 679, 684, 690, 701, 713, 724,]
         }
 
-        target     = [closest_wavelength(w, bands if not args.use_HICO_aph else get_sensor_bands('HICO-aph', args) ) for w in product_bands.get(products[0], product_bands['default'])]
+        target     = [closest_wavelength(w, bands if not args.use_HICO_aph else get_sensor_bands(f'{sensor}-aph', args) ) for w in product_bands.get(products[0], product_bands['default'])]
         print('Target',target)
         plot_label = [w in target for w in bands]
         if args.use_HICO_aph: 
-            plot_label_aph = [w in target for w in get_sensor_bands('HICO-aph', args)]
+            plot_label_aph = [w in target for w in get_sensor_bands(f'{sensor}-aph', args)]
             #y_test=y_test[:,[ i in get_sensor_bands('HICO-aph', args) for i in  get_sensor_bands(sensor, args)]]
         if args.use_HICO_aph and (products[0]=='ad' or products[0]=='ag'): 
                 product_bands = {
-                    'default' :  get_sensor_bands('HICO-adag', args)#[415,444,478,535,564,593,621]#list(get_sensor_bands('HICO-adag', args))
+                    'default' :  [get_sensor_bands(f'{sensor}-adag', args)[0],get_sensor_bands(f'{sensor}-adag', args)[2],get_sensor_bands(f'{sensor}-adag', args)[4]] #[415,444,478,535,564,593,621]#list(get_sensor_bands('HICO-adag', args))
                 }
-                target     = [closest_wavelength(w, bands if not args.use_HICO_aph else get_sensor_bands('HICO-adag', args)) for w in product_bands.get(products[0], product_bands['default'])]
-                plot_label_aph = [w in target for w in get_sensor_bands('HICO-adag', args)]
+                target     = [closest_wavelength(w, bands if not args.use_HICO_aph else get_sensor_bands(f'{sensor}-adag', args)) for w in product_bands.get(products[0], product_bands['default'])]
+                plot_label_aph = [w in target for w in get_sensor_bands(f'{sensor}-adag', args)]
         plot_label = [w in target for w in bands]
 
         plot_order =  ['MDN','QAA','GIOP']
@@ -465,13 +465,13 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
                 curr_idx += 1
                 continue 
             if est_lbl =='GIOP' or est_lbl =='QAA':
-                if not args.use_HICO_aph or (np.shape(benchmarks[product][est_lbl])[1] !=  np.shape(get_sensor_bands('HICO-aph', args))[0] and args.use_HICO_aph and product=='aph')  or (np.shape(benchmarks[product][est_lbl])[1] !=  np.shape(get_sensor_bands('HICO-adag', args))[0] and args.use_HICO_aph and (product=='ad' or product=='ag' ) ):
+                if not args.use_HICO_aph or (np.shape(benchmarks[product][est_lbl])[1] !=  np.shape(get_sensor_bands(f'{sensor}-aph', args))[0] and args.use_HICO_aph and product=='aph')  or (np.shape(benchmarks[product][est_lbl])[1] !=  np.shape(get_sensor_bands(f'{sensor}-adag', args))[0] and args.use_HICO_aph and (product=='ad' or product=='ag' ) ):
                     benchmarks[product][est_lbl] = np.reshape(benchmarks[product][est_lbl],(-1,np.shape(get_sensor_bands(sensor, args))[0]))   #if not args.use_HICO_aph  else np.reshape(benchmarks[product][est_lbl],(-1,np.shape(get_sensor_bands('HICO-aph', args))[0])) #if np.shape(benchmarks[product][est_lbl])[0] == 1786*np.shape(get_sensor_bands(sensor, args))[0] else  np.reshape(benchmarks[product][est_lbl],(1786,np.shape(get_sensor_bands(sensor, args))[0])) #np.shape(benchmarks[product]['MDN']))
                 #Resample to HICO_aph wavelengths
                 if args.use_HICO_aph and np.shape(benchmarks[product][est_lbl])[1] ==  np.shape(get_sensor_bands(sensor, args))[0] and product == 'aph':
-                    benchmarks[product][est_lbl] = benchmarks[product][est_lbl][:,[ i in get_sensor_bands('HICO-aph', args) for i in  get_sensor_bands(sensor, args)]]
+                    benchmarks[product][est_lbl] = benchmarks[product][est_lbl][:,[ i in get_sensor_bands(f'{sensor}-aph', args) for i in  get_sensor_bands(sensor, args)]]
                 if args.use_HICO_aph and np.shape(benchmarks[product][est_lbl])[1] ==  np.shape(get_sensor_bands(sensor, args))[0] and (product == 'ad' or  product == 'ag'):
-                    benchmarks[product][est_lbl] = benchmarks[product][est_lbl][:,[ i in get_sensor_bands('HICO-adag', args) for i in  get_sensor_bands(sensor, args)]]            
+                    benchmarks[product][est_lbl] = benchmarks[product][est_lbl][:,[ i in get_sensor_bands(f'{sensor}-adag', args) for i in  get_sensor_bands(sensor, args)]]            
                     
             y_est = benchmarks[product][est_lbl] if isinstance(plot_order, dict) else benchmarks[product][est_lbl][..., plt_idx]
             ax    = axes[curr_idx]
@@ -600,7 +600,7 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
     filename = folder.joinpath(f'{out_dir}/{img_outlbl}{",".join(products)}_{sensor}_{n_pts}test_{u_label}.png')
     plt.tight_layout()
     # plt.subplots_adjust(wspace=0.35)
-    plt.savefig(filename.as_posix(), dpi=400, bbox_inches='tight', pad_inches=0.1,)
+    plt.savefig(filename.as_posix(), dpi=600, bbox_inches='tight', pad_inches=0.1,)
     plt.show()
 
 def plot_spectra(y_test, benchmarks, bands, labels, products, sensor, title=None, methods=None, n_col=3, img_outlbl='',args=None,y_full=None,slices=None):
@@ -1125,31 +1125,29 @@ def plot_remote_insitu(y_remote, y_insitu, dictionary_of_matchups=None, products
     
     #################3
     #A third plot of aph, ag, and ad
-    n_row = 2
+    n_row = 4
     n_col = 4
     fig_size   = 5
     plt_idx = 0
     plt.rc('text', usetex=True)
     plt.rcParams['mathtext.default']='regular'
 
-    fig, axes = plt.subplots(n_row, n_col, figsize=(fig_size*n_col, fig_size*n_row))
-    axes      = [ax for axs in np.atleast_1d(axes) for ax in np.atleast_1d(axs)]
+    
     colors    = ['xkcd:sky blue', 'xkcd:tangerine', 'xkcd:fresh green', 'xkcd:greyish blue', 'xkcd:goldenrod',  'xkcd:clay', 'xkcd:bluish purple', 'xkcd:reddish', 'xkcd:neon purple']
 
-    full_ax  = fig.add_subplot(111, frameon=False)
-    full_ax.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False, pad=10)
+
 
     xlabel = fr'$\mathbf{{Band [nm]}}$'
     ylabel = fr'$\mathbf{{a\textsubscript{{ph}} [m\textsuperscript{{-1}}]}}$'
-    ylabel_ad_ag = fr'$\mathbf{{a\textsubscript{{d}} | a\textsubscript{{g}} [m\textsuperscript{{-1}}]}}$'
+    ylabel_ag = fr'$\mathbf{{a\textsubscript{{g}} [m\textsuperscript{{-1}}]}}$'
+    ylabel_ad = fr'$\mathbf{{a\textsubscript{{d}} [m\textsuperscript{{-1}}]}}$'
+    ylabel_rrs = fr'$\mathbf{{R\textsubscript{{rs}} [sr\textsuperscript{{-1}}]}}$'
 
-    full_ax.set_xlabel(xlabel.replace(' ', '\ '), fontsize=20, labelpad=10)
     # full_ax.set_ylabel(ylabel.replace(' ', '\ '), fontsize=20, labelpad=30) 
     # full_ax2 = full_ax.twinx()
     # full_ax2.set_ylabel(ylabel.replace(' ', '\ '), fontsize=20, labelpad=30) 
     # full_ax.set_ylabel(ylabel.replace(' ', '\ '), fontsize=20, labelpad=30) 
 
-    plt_idx=0
     aph_resampled = dictionary_of_matchups['insitu_aph_resampled']
     aph_wvl_resampled = dictionary_of_matchups['insitu_aph_resampled_wvl']
     aph_wvl_resampled = aph_wvl_resampled[0,:]
@@ -1167,89 +1165,191 @@ def plot_remote_insitu(y_remote, y_insitu, dictionary_of_matchups=None, products
     current_product = 'aph'
     bands  = np.array( get_sensor_bands(args.sensor, args) ) if args.use_HICO_aph == False and current_product == 'aph' else  np.array( get_sensor_bands('HICO-aph', args) ) if args.use_HICO_aph == True and current_product == 'aph' else  np.array( get_sensor_bands('HICO-adag', args) ) if args.use_HICO_aph == True and (current_product == 'ad' or current_product == 'ag') else np.array( get_sensor_bands(args.sensor, args) ) 
     bands_ad_ag = np.array( get_sensor_bands('HICO-adag', args) )
-    counter = 0
-    site_labels_of_interest = ['St. Andrews Bay (SA11)\nApr. 14, 2010','Pensacola Bay (PB09)\nAug. 26, 2011','Pensacola Bay (PB05)\nAug. 26, 2011','Pensacola Bay (PB04)\nAug. 26, 2011'] #, 'Pensacola Bay (PB14)\nJun. 02, 2011','Pensacola Bay (PB08)\nJun. 02, 2011','Choctawhatchee Bay (CH01)\nJul. 30, 2011','Choctawhatchee Bay (CH03)\nJul. 30, 2011','WE4','WE8','Gulf_Mexico 72','Gulf_Mexico 82'
+    site_labels_of_interest_1 = ['St. Andrews Bay (SA11)\nApr. 14, 2010','Pensacola Bay (PB09)\nAug. 26, 2011','Pensacola Bay (PB05)\nAug. 26, 2011','Pensacola Bay (PB04)\nAug. 26, 2011'] #, 'Pensacola Bay (PB14)\nJun. 02, 2011','Pensacola Bay (PB08)\nJun. 02, 2011','Choctawhatchee Bay (CH01)\nJul. 30, 2011','Choctawhatchee Bay (CH03)\nJul. 30, 2011','WE4','WE8','Gulf_Mexico 72','Gulf_Mexico 82'
     site_labels_of_interest_2 = ['Pensacola Bay (PB14)\nJun. 02, 2011','Pensacola Bay (PB08)\nJun. 02, 2011','Choctawhatchee Bay (CH01)\nJul. 30, 2011','Choctawhatchee Bay (CH03)\nJul. 30, 2011']
+    
+    for site_label_set,site_labels_of_interest in enumerate([site_labels_of_interest_1, site_labels_of_interest_2]):
+        counter = 0
+        i = []
+        plt_idx=0
+        fig, axes = plt.subplots(n_row, n_col, figsize=(fig_size*n_col, fig_size*n_row))
+        axes      = [ax for axs in np.atleast_1d(axes) for ax in np.atleast_1d(axs)]
+        full_ax  = fig.add_subplot(111, frameon=False)
+        full_ax.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False, pad=10)
+        full_ax.set_xlabel(xlabel.replace(' ', '\ '), fontsize=20, labelpad=10)
 
-    i = []
-    for plotting_label_current in site_labels_of_interest:
-        if plotting_label_current in dictionary_of_matchups['plotting_labels']:
-            index_of_plotting_label = np.where(plotting_label_current == dictionary_of_matchups['plotting_labels'])
-            index = index_of_plotting_label[0][0]
-        else:
-            print("NOT IN DICTIONARY")
-            continue
-        
-        if plt_idx > 3: continue
-        cdom_remote_estimate = round(np.asscalar(np.squeeze(np.asarray(y_remote_OG[0][:,:,y_remote_OG[1]["cdom"]]))[index]),round_digits)
-        cdom_insitu_estimate = round(np.asscalar(np.squeeze(np.asarray(y_insitu_OG[0][:,:,y_insitu_OG[1]["cdom"]]))[index]),round_digits)
-
-        aph_remote_estimate =  np.squeeze(np.asarray(y_remote_OG[0][:,:,y_remote_OG[1]["aph"]]))[index]
-        aph_insitu_estimate =  np.squeeze(np.asarray(y_insitu_OG[0][:,:,y_insitu_OG[1]["aph"]]))[index]
-
-        ad_remote_estimate =  np.squeeze(np.asarray(y_remote_OG[0][:,:,y_remote_OG[1]["ad"]]))[index]
-        ad_insitu_estimate =  np.squeeze(np.asarray(y_insitu_OG[0][:,:,y_insitu_OG[1]["ad"]]))[index]
-        
-        ag_remote_estimate =  np.squeeze(np.asarray(y_remote_OG[0][:,:,y_remote_OG[1]["ag"]]))[index]
-        ag_insitu_estimate =  np.squeeze(np.asarray(y_insitu_OG[0][:,:,y_insitu_OG[1]["ag"]]))[index]
-
-        
-        if np.any(np.isnan(aph_resampled),axis=1)[index] or np.any(np.isnan(aph_remote_estimate)): continue
-        ax = axes[plt_idx]
-        ax.plot(aph_wvl_resampled,aph_resampled[index,:], 'k',label='Measured')
-        ax.plot(bands,aph_insitu_estimate,'g',label=fr'$\mathit{{In \ situ}}$')
-        ax.plot(bands,aph_remote_estimate,'r',label='Remote')
-        ax.set_ylim([0,0.5])
-        ax.set_xlim([400,700])
-        ax.grid()
-        ax.set_xticklabels([])
-        if plt_idx == 0: 
-            ax.legend()
-            ax.set_ylabel(ylabel.replace(' ', '\ '), fontsize=20, labelpad=30) 
-        else:
-            ax.set_xticklabels([])
-            ax.set_yticklabels([])
-
-        #ax2=ax.twinx()
-        plt_idx_2=plt_idx+n_col
-
-
-        ax2 = axes[plt_idx_2]
-        ax2.plot(ad_wvl_resampled,ad_resampled[index,:], 'k',label=fr'$a\textsubscript{{d}}$')
-        ax2.plot(ag_wvl_resampled,ag_resampled[index,:], 'k-.',label=fr'$a\textsubscript{{g}}$')
-        
-        ax2.plot(bands_ad_ag,ad_remote_estimate,'r')
-        ax2.plot(bands_ad_ag,ag_remote_estimate,'r-.')
-        ag_measurement=dictionary_of_matchups['cdom'][index][0]
-        ax2.plot(443,ag_measurement,'k.',markersize=12,label=fr'$cdom\textsubscript{{443}}$')
-        ax2.plot(443,cdom_remote_estimate,'r.',markersize=12)
-        ax2.plot(443,cdom_insitu_estimate,'g.',markersize=12)
-
-        ax2.plot(bands_ad_ag,ad_insitu_estimate,'g')
-        ax2.plot(bands_ad_ag,ag_insitu_estimate,'g-.')
-        
-
-        if plt_idx_2 == n_col: 
-            ax2.legend()
-            ax2.set_ylabel(ylabel_ad_ag.replace(' ', '\ '), fontsize=20, labelpad=30) 
-        else:
-            ax2.set_yticklabels([])
+        for plotting_label_current in site_labels_of_interest:
+            if plotting_label_current in dictionary_of_matchups['plotting_labels']:
+                index_of_plotting_label = np.where(plotting_label_current == dictionary_of_matchups['plotting_labels'])
+                index = index_of_plotting_label[0][0]
+            else:
+                print("NOT IN DICTIONARY")
+                continue
             
+            if plt_idx > 3: continue
 
-        ax2.set_ylim([0,1])
-        ax2.set_xlim([400,700])
-        ax2.grid()
+            
+            cdom_remote_estimate = round(np.asscalar(np.squeeze(np.asarray(y_remote_OG[0][:,:,y_remote_OG[1]["cdom"]]))[index]),round_digits)
+            cdom_insitu_estimate = round(np.asscalar(np.squeeze(np.asarray(y_insitu_OG[0][:,:,y_insitu_OG[1]["cdom"]]))[index]),round_digits)
+    
+            aph_remote_estimate =  np.squeeze(np.asarray(y_remote_OG[0][:,:,y_remote_OG[1]["aph"]]))[index]
+            aph_insitu_estimate =  np.squeeze(np.asarray(y_insitu_OG[0][:,:,y_insitu_OG[1]["aph"]]))[index]
+    
+            ad_remote_estimate =  np.squeeze(np.asarray(y_remote_OG[0][:,:,y_remote_OG[1]["ad"]]))[index]
+            ad_insitu_estimate =  np.squeeze(np.asarray(y_insitu_OG[0][:,:,y_insitu_OG[1]["ad"]]))[index]
+            
+            ag_remote_estimate =  np.squeeze(np.asarray(y_remote_OG[0][:,:,y_remote_OG[1]["ag"]]))[index]
+            ag_insitu_estimate =  np.squeeze(np.asarray(y_insitu_OG[0][:,:,y_insitu_OG[1]["ag"]]))[index]
+    
 
-        ax.set_title(dictionary_of_matchups['plotting_labels'][index][0].replace('_',''))
-        plt_idx=plt_idx+1
-        # if plt_idx < 24: ax.set_xticks([])
-        counter = counter+1
-       
-    plt.tight_layout()
-    filename = folder.joinpath(f'pb_matchups_1_{run_name}_{products}_{sensor}.jpg')
-    plt.savefig(filename.as_posix(), dpi=400, bbox_inches='tight', pad_inches=0.1,)
+            if np.any(np.isnan(aph_resampled),axis=1)[index] or np.any(np.isnan(aph_remote_estimate)): continue
+            linewidth_truth=3.5
+            linewidth_insitu=linewidth_truth-0.75
+            linewidth_remote=linewidth_truth-1.5
 
-    plt.show()
+        
+            ax0 = axes[plt_idx]
+            
+            ax0.plot(dictionary_of_matchups['insitu_Rrs_resampled_wvl'][0,:],dictionary_of_matchups['insitu_Rrs_resampled'][index,:],'c',label=fr'$\mathit{{In \ situ}}$',linewidth=linewidth_insitu)
+            ax0.plot(dictionary_of_matchups['Rrs_retrieved_wvl'][0,:],dictionary_of_matchups['Rrs_retrieved'][index,:],'r',label='Remote',linewidth=linewidth_remote)
+            ax0.set_ylim([0,0.01])
+            ax0.set_xlim([400,700])
+            ax0.grid()
+            ax0.set_xticklabels([])
+            if plt_idx == 0: 
+                # ax0.legend(fontsize=26)
+                ax0.set_ylabel(ylabel_rrs.replace(' ', '\ '), fontsize=26, labelpad=30) 
+                # ax.tick_params(axis='x', labelsize=8)
+                ax0.tick_params(axis='y', labelsize=22)
+            else:
+                ax0.set_xticklabels([])
+                ax0.set_yticklabels([])            
+            
+            
+            plt_idx_1_5 = plt_idx+n_col
+            ax = axes[plt_idx_1_5]
+            ax.plot(aph_wvl_resampled,aph_resampled[index,:], 'k',label='Measured',linewidth=linewidth_truth)
+            ax.plot(bands,aph_insitu_estimate,'c',label=fr'$\mathit{{In \ situ}}$',linewidth=linewidth_insitu)
+            ax.plot(bands,aph_remote_estimate,'r',label='Remote',linewidth=linewidth_remote)
+            ax.set_ylim([0,0.6])
+            ax.set_xlim([400,700])
+            ax.grid()
+            ax.set_xticklabels([])
+
+            if plt_idx_1_5 == n_col: 
+                ax.legend(fontsize=24)
+                ax.set_ylabel(ylabel.replace(' ', '\ '), fontsize=26, labelpad=30) 
+                ax.tick_params(axis='y', labelsize=22)
+            else:
+                ax.set_xticklabels([])
+                ax.set_yticklabels([])        
+            #####################
+            #ax2=ax.twinx()
+            plt_idx_2=plt_idx_1_5+n_col
+    
+    
+            ax2 = axes[plt_idx_2]
+            # ax2.plot(ad_wvl_resampled,ad_resampled[index,:], 'k',label=fr'$a\textsubscript{{d}}$')
+            ax2.plot(ag_wvl_resampled,ag_resampled[index,:], 'k',label=fr'$a\textsubscript{{g}}$',linewidth=linewidth_truth)
+            
+            # ax2.plot(bands_ad_ag,ad_remote_estimate,'r')
+            ax2.plot(bands_ad_ag,ag_insitu_estimate,'c',linewidth=linewidth_insitu)
+            ax2.plot(bands_ad_ag,ag_remote_estimate,'r',linewidth=linewidth_remote)
+            ag_measurement=dictionary_of_matchups['cdom'][index][0]
+            ax2.plot(443,ag_measurement,'k.',markersize=15,label=fr'$cdom\textsubscript{{443}}$')
+            ax2.plot(443,cdom_remote_estimate,'r.',markersize=15)
+            ax2.plot(443,cdom_insitu_estimate,'c.',markersize=15)
+    
+            # ax2.plot(bands_ad_ag,ad_insitu_estimate,'g')
+            import math 
+            from .utils import convert_point_slope_to_spectral_cdom, convert_spectral_cdom_to_point_slope
+            # wavelengths = [412,443,500,550,600,650,700]
+            # CDOM=1.5
+            # SCDOM = 0.0182
+            # spectral_CDOM = convert_point_slope_to_spectral_cdom(CDOM,SCDOM,wavelengths,reference_CDOM_wavelength=440)
+            # plt.plot(wavelengths,spectral_CDOM)
+            # plt.ylabel('ag | ad')
+            # plt.xlabel('Wavelength (nm)')
+
+            # plt.show()
+            allowed_error=20
+            CDOM_truth,SCDOM_truth = convert_spectral_cdom_to_point_slope(ag_wvl_resampled,ag_resampled[index,:],reference_CDOM_wavelength=443,spectral_min_max=[400,700],allowed_error=allowed_error)
+
+            CDOM_insitu,SCDOM_insitu = convert_spectral_cdom_to_point_slope(bands_ad_ag,ag_insitu_estimate,reference_CDOM_wavelength=443,spectral_min_max=[400,700],allowed_error=allowed_error)
+            CDOM_remote,SCDOM_remote = convert_spectral_cdom_to_point_slope(bands_ad_ag,ag_remote_estimate,reference_CDOM_wavelength=443,spectral_min_max=[400,700],allowed_error=allowed_error)
+            font_cdom=18
+            CDOM_truth_rounded=np.round(ag_measurement,1)
+            ax2.text(463,2.2,f'ag(443) : (CDOM) : S-CDOM',color='k',fontsize=font_cdom)
+            ax2.text(505,2.05,f'{CDOM_truth:.2f} : ({CDOM_truth_rounded:.1f}) : {SCDOM_truth:.4f}',color='k',fontsize=font_cdom)
+            ax2.text(505,1.9,f'{CDOM_insitu:.2f} : ({cdom_insitu_estimate:.1f}) : {SCDOM_insitu:.4f}',color='c',fontsize=font_cdom)
+            ax2.text(505,1.75,f'{CDOM_remote:.2f} : ({cdom_remote_estimate:.1f}) : {SCDOM_remote:.4f}',color='r',fontsize=font_cdom)
+
+
+
+    
+            if plt_idx_2 == 2*n_col: 
+                # ax2.legend()
+                ax2.set_ylabel(ylabel_ag.replace(' ', '\ '), fontsize=26, labelpad=30) 
+                ax2.set_xticklabels([])
+                ax2.tick_params(axis='y', labelsize=22)
+            else:
+                ax2.set_xticklabels([])
+                ax2.set_yticklabels([])
+                
+    
+            ax2.set_ylim([0,2.5])
+            ax2.set_xlim([400,700])
+            ax2.grid()
+            #####################
+    
+            plt_idx_3=plt_idx_2+n_col
+    
+    
+            ax3 = axes[plt_idx_3]
+            ax3.plot(ad_wvl_resampled,ad_resampled[index,:], 'k',label=fr'$a\textsubscript{{d}}$',linewidth=linewidth_truth)
+            # ax3.plot(ag_wvl_resampled,ag_resampled[index,:], 'k-.',label=fr'$a\textsubscript{{g}}$')
+            ax3.plot(bands_ad_ag,ad_insitu_estimate,'c',linewidth=linewidth_insitu)
+            ax3.plot(bands_ad_ag,ad_remote_estimate,'r',linewidth=linewidth_remote)
+            # ax3.plot(bands_ad_ag,ag_remote_estimate,'r-.')
+            ag_measurement=dictionary_of_matchups['cdom'][index][0]
+            # ax3.plot(443,ag_measurement,'k.',markersize=12,label=fr'$cdom\textsubscript{{443}}$')
+            # ax3.plot(443,cdom_remote_estimate,'r.',markersize=12)
+            # ax3.plot(443,cdom_insitu_estimate,'g.',markersize=12)
+    
+            # ax3.plot(bands_ad_ag,ag_insitu_estimate,'g-.')
+            
+            NAP_truth,SNAP_truth = convert_spectral_cdom_to_point_slope(ad_wvl_resampled,ad_resampled[index,:],reference_CDOM_wavelength=443,spectral_min_max=[400,700],allowed_error=allowed_error)
+            NAP_insitu,SNAP_insitu = convert_spectral_cdom_to_point_slope(bands_ad_ag,ad_insitu_estimate,reference_CDOM_wavelength=443,spectral_min_max=[400,700],allowed_error=allowed_error)
+            NAP_remote,SNAP_remote = convert_spectral_cdom_to_point_slope(bands_ad_ag,ad_remote_estimate,reference_CDOM_wavelength=443,spectral_min_max=[400,700],allowed_error=allowed_error)
+            font_cdom=18
+            ax3.text(508,1.3,f'ad(443) : S-NAP',color='k',fontsize=font_cdom)
+            ax3.text(535,1.2,f'{NAP_truth:.2f} : {SNAP_truth:.4f}',color='k',fontsize=font_cdom)
+            ax3.text(535,1.1,f'{NAP_insitu:.2f} :  {SNAP_insitu:.4f}',color='c',fontsize=font_cdom)
+            ax3.text(535,1.0,f'{NAP_remote:.2f} :  {SNAP_remote:.4f}',color='r',fontsize=font_cdom)
+            
+            
+            if plt_idx_3 == 3*n_col: 
+                ax3.set_ylabel(ylabel_ad.replace(' ', '\ '), fontsize=26, labelpad=30) 
+                ax3.tick_params(axis='y', labelsize=22)
+            else:
+                ax3.set_yticklabels([])
+                
+            ax3.tick_params(axis='x', labelsize=22)
+
+            ax3.set_ylim([0,1.5])
+            ax3.set_xlim([400,700])
+            ax3.grid()
+            
+            ax0.set_title(dictionary_of_matchups['plotting_labels'][index][0].replace('_',''),fontsize=24)
+            plt_idx=plt_idx+1
+            # if plt_idx < 24: ax.set_xticks([])
+            counter = counter+1
+           
+        plt.tight_layout()
+        filename = folder.joinpath(f'pb_matchups_1_{run_name}_{products}_{sensor}_{site_label_set}.jpg')
+        plt.savefig(filename.as_posix(), dpi=400, bbox_inches='tight', pad_inches=0.1,)
+    
+        # plt.show()
     
 
     
