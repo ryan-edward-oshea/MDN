@@ -1,4 +1,4 @@
-from .metrics import slope, sspb, mdsa 
+from .metrics import slope, sspb, mdsa, rmsle, r_squared
 from .meta import get_sensor_label,get_sensor_bands
 from .utils import closest_wavelength, ignore_warnings
 from collections import defaultdict as dd 
@@ -300,12 +300,12 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
 
     product_labels = default_dd({
         'chl' : 'Chl\\textit{a}',
-        'aph' : '\\textit{a}_{ph}',
-        'ad' : '\\textit{a}_{d}',
-        'ag' : '\\textit{a}_{g}',
+        'aph' : 'a_{\\textit{ph}}',
+        'ad' : 'a_{\\textit{nap}}',
+        'ag' : 'a_{\\textit{cdom}}',
         'tss' : 'TSS',
         'pc' : 'PC',
-        'cdom': '\\textit{a}_{CDOM}',   
+        'cdom': 'CDOM',#'a_{\\textit{cdom}}(443)',   
     })
     
     product_units = default_dd({
@@ -333,7 +333,7 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
     # Only plot certain bands
     if len(labels) > 3 :
         product_bands = {
-            'default' :  [443,482,561,655] if 'OLI'  in sensor else [443,490,560,620,673,710]  if 'OLCI' in sensor  else [443,620,673,]  if args.use_HICO_aph  else  [409,443,478,535,620,673,690,724]  #[415,443,490,501,550,620,673,690] #[443,482,561,655]
+            'default' :  [443,482,561,655] if 'OLI'  in sensor else [443,490,560,620,673,710]  if 'OLCI' in sensor  else [443,530,620,673,]  if args.use_HICO_aph  else  [409,443,478,535,620,673,690,724]  #[415,443,490,501,550,620,673,690] #[443,482,561,655]
             # 'aph'     : [443, 530], [409, 421, 432, 444, 455, 467, 478, 490, 501, 512, 524, 535, 547, 558, 570, 581, 593, 604, 616, 621, 633, 644, 650, 656, 667, 673, 679, 684, 690, 701, 713, 724,]
         }
 
@@ -465,14 +465,29 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
                 curr_idx += 1
                 continue 
             if est_lbl =='GIOP' or est_lbl =='QAA':
+                # valid_bool = []
+                # wvls = get_sensor_bands(sensor, args)
+                valid_bool = []
+                required_wvl = get_sensor_bands(f'{sensor}-adag', args)
+                wvls = get_sensor_bands(sensor, args)
+                for required_wvl_i in required_wvl:
+                    wvl_diff = [i.item() for i in np.abs(wvls - required_wvl_i)]
+                    wvl_diff_bool = [wvl_diff_i < 4 for wvl_diff_i in wvl_diff]
+                    valid_bool.append([wvl_diff_bool_i if np.argmin(wvl_diff) == i else False for  i,wvl_diff_bool_i in enumerate(wvl_diff_bool) ])
+                
+                valid_wvl_ad_ag =np.any(np.array(valid_bool),axis=0)
+                
                 if not args.use_HICO_aph or (np.shape(benchmarks[product][est_lbl])[1] !=  np.shape(get_sensor_bands(f'{sensor}-aph', args))[0] and args.use_HICO_aph and product=='aph')  or (np.shape(benchmarks[product][est_lbl])[1] !=  np.shape(get_sensor_bands(f'{sensor}-adag', args))[0] and args.use_HICO_aph and (product=='ad' or product=='ag' ) ):
                     benchmarks[product][est_lbl] = np.reshape(benchmarks[product][est_lbl],(-1,np.shape(get_sensor_bands(sensor, args))[0]))   #if not args.use_HICO_aph  else np.reshape(benchmarks[product][est_lbl],(-1,np.shape(get_sensor_bands('HICO-aph', args))[0])) #if np.shape(benchmarks[product][est_lbl])[0] == 1786*np.shape(get_sensor_bands(sensor, args))[0] else  np.reshape(benchmarks[product][est_lbl],(1786,np.shape(get_sensor_bands(sensor, args))[0])) #np.shape(benchmarks[product]['MDN']))
                 #Resample to HICO_aph wavelengths
                 if args.use_HICO_aph and np.shape(benchmarks[product][est_lbl])[1] ==  np.shape(get_sensor_bands(sensor, args))[0] and product == 'aph':
                     benchmarks[product][est_lbl] = benchmarks[product][est_lbl][:,[ i in get_sensor_bands(f'{sensor}-aph', args) for i in  get_sensor_bands(sensor, args)]]
                 if args.use_HICO_aph and np.shape(benchmarks[product][est_lbl])[1] ==  np.shape(get_sensor_bands(sensor, args))[0] and (product == 'ad' or  product == 'ag'):
-                    benchmarks[product][est_lbl] = benchmarks[product][est_lbl][:,[ i in get_sensor_bands(f'{sensor}-adag', args) for i in  get_sensor_bands(sensor, args)]]            
-                    
+                    benchmarks[product][est_lbl] = benchmarks[product][est_lbl][:,valid_wvl_ad_ag ] #[ i in get_sensor_bands(f'{sensor}-adag', args) for i in  get_sensor_bands(sensor, args)]]            
+
+
+            
+            
             y_est = benchmarks[product][est_lbl] if isinstance(plot_order, dict) else benchmarks[product][est_lbl][..., plt_idx]
             ax    = axes[curr_idx]
             cidx  = (curr_idx % n_col) if plot_bands else curr_idx
@@ -559,7 +574,7 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
             add_identity(ax, ls='--', color='k', zorder=20)
 
             if valid.sum():
-                add_stats_box(ax, y_true[valid], y_est[valid])
+                add_stats_box(ax, y_true[valid], y_est[valid],metrics=[mdsa,sspb,slope,rmsle])
                 # if plot_order[est_idx] == 'MDN' and product == 'aph': 
                 #     if plot_order[est_idx] not in args.summary_stats.keys(): args.summary_stats[ plot_order[est_idx]] = {}
                 #     args.summary_stats[ plot_order[est_idx]][label[1]] = create_stats_HPC(y_true[valid], y_est[valid], metrics=[mdsa, sspb, slope],label=None)
@@ -573,10 +588,14 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
                     # ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$'+'\n'+r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$', fontsize=18)
                     ax.set_title(r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$' + '\n' + fr'$\mathbf{{\large{{{est_lbl}}}}}$', fontsize=18, linespacing=0.95)
                 
+                elif est_lbl == 'QAA_CDOM':
+                    # ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$'+'\n'+r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$', fontsize=18)
+                    ax.set_title( r'$\mathbf{{\large{QAA}}}' + r'$\small{\textit{CDOM}', fontsize=18, linespacing=0.95)
+          
                 elif est_lbl == 'Ficek':
                     # ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$'+'\n'+r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$', fontsize=18)
                     ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$' + r'$\small{\textit{\ (et\ al.\ 2011)}}$', fontsize=18, linespacing=0.95)
-                
+                                
                 elif est_lbl == 'Mannino':
                     # ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$'+'\n'+r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$', fontsize=18)
                     ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$' + r'$\small{\textit{\ (et\ al.\ 2008)}}$', fontsize=18, linespacing=0.95)
@@ -734,10 +753,10 @@ def plot_histogram(product_values,products,slices,locs):
     ax.set_axisbelow(True)
     colors = ['aqua', 'orangered',  'xkcd:tangerine', 'xkcd:fresh green', 'xkcd:clay', 'magenta', 'xkcd:sky blue', ]
     product_labels = default_dd({
-        'chl' : 'Chl\\textit{a}',
+        'chl' : 'chl\\textit{a}',
         'pc'  : 'PC',
         'tss'  : 'TSS',
-        'cdom'  : 'CDOM',
+        'cdom'  : 'CDOM',#'a_{\mathit{cdom}}(443)',
 
         'chl/pc': 'Chl\\textit{a}:PC',
         'pc/chl': 'PC:Chl\\textit{a}',
@@ -877,9 +896,16 @@ def plot_histogram(product_values,products,slices,locs):
     plt.savefig(filename.as_posix(), dpi=600, bbox_inches='tight', pad_inches=0.1,)
     plt.close()
 
-    print('Mean of {}: {} Median of {}:'.format(products[0],np.mean(product_values[:,chl_loc]),np.median(product_values[:,chl_loc])))
-    print('Mean of {}: {} Median of {}:'.format(products[1],np.mean(product_values[:,PC_loc]),np.median(product_values[:,PC_loc])))
-    print('Mean of {}: {} Median of {}:'.format(products[1],np.mean(product_values[:,PC_loc]/product_values[:,chl_loc]),np.median(product_values[:,PC_loc]/product_values[:,chl_loc])))
+    print('Mean of {}: {} Median of {}:'.format(products[chl_loc],np.nanmean(product_values[:,chl_loc]),np.nanmedian(product_values[:,chl_loc])))
+    print('Mean of {}: {} Median of {}:'.format(products[PC_loc],np.nanmean(product_values[:,PC_loc]),np.nanmedian(product_values[:,PC_loc])))
+
+    print('Mean of {}: {} Median of {}:'.format(products[cdom_loc],np.nanmean(product_values[:,cdom_loc]),np.nanmedian(product_values[:,cdom_loc])))
+
+    print('Mean of {}: {} Median of {}:'.format(products[tss_loc],np.nanmean(product_values[:,tss_loc]),np.nanmedian(product_values[:,tss_loc])))
+
+
+    # print('Mean of {}: {} Median of {}:'.format(products[1],np.mean(product_values[:,PC_loc]),np.median(product_values[:,PC_loc])))
+    # print('Mean of {}: {} Median of {}:'.format(products[1],np.mean(product_values[:,PC_loc]/product_values[:,chl_loc]),np.median(product_values[:,PC_loc]/product_values[:,chl_loc])))
 
 
 @ignore_warnings
@@ -912,15 +938,30 @@ def plot_remote_insitu(y_remote, y_insitu, dictionary_of_matchups=None, products
 
     product_labels = default_dd({
         'chl' : 'Chl\\textit{a}',
-        'PC'  : 'PC'
-    })
+        'pc'  : 'PC',
+        'aph' :  'a_{\mathit{ph}}',
+        'ad' :  'a_{\mathit{nap}}',
+        'ag' : 'a_{\mathit{cdom}}',
+        'ag443' : 'a_{\mathit{cdom}(443)}',
+        'ad443' : 'a_{\mathit{nap}(443)}',
+
+        'tss' : 'TSS',
+        'rrs' : 'R_{\mathit{rs}}',
+
+        })
 
     product_units = default_dd({
         'chl' : '[mg m^{-3}]',
         'PC' : '[mg m^{-3}]',
+        'pc' : '[mg m^{-3}]',
+        'rrs' : '[sr^{-1}]',
 
         'tss' : '[g m^{-3}]',
+        
         'aph' : '[m^{-1}]',
+        'ad' : '[m^{-1}]',
+        'ag' : '[m^{-1}]',
+
     }, lambda k: '')
 
     font= {'size':15}
@@ -942,7 +983,7 @@ def plot_remote_insitu(y_remote, y_insitu, dictionary_of_matchups=None, products
         s_lbl = get_sensor_label(sensor).replace('-',' ')
         n_pts = len(y_insitu)
         title = fr'$\mathbf{{\underline{{\large{{{s_lbl}}}}}}}$' + '\n' + fr'$\small{{\mathit{{N\small{{=}}}}{n_pts}}}$'
-        full_ax.set_title(title.replace(' ', '\ '), fontsize=24, y=1.04)
+        # full_ax.set_title(title.replace(' ', '\ '), fontsize=24, y=1.04)
 
         curr_idx = 0
         cidx  = plt_idx
@@ -996,7 +1037,7 @@ def plot_remote_insitu(y_remote, y_insitu, dictionary_of_matchups=None, products
             ax.legend(loc='lower right', prop={'weight':'bold', 'size': 16})
 
         add_identity(ax, ls='--', color='k', zorder=20)
-        add_stats_box(ax, y_insitu.flatten()[valid], y_remote.flatten()[valid])
+        add_stats_box(ax, y_insitu.flatten()[valid], y_remote.flatten()[valid],metrics=[slope,r_squared])
 
         ax.tick_params(labelsize=12)
         ax.grid('on', alpha=0.3)
@@ -1139,10 +1180,33 @@ def plot_remote_insitu(y_remote, y_insitu, dictionary_of_matchups=None, products
 
     xlabel = fr'$\mathbf{{Band [nm]}}$'
     ylabel = fr'$\mathbf{{a\textsubscript{{ph}} [m\textsuperscript{{-1}}]}}$'
-    ylabel_ag = fr'$\mathbf{{a\textsubscript{{g}} [m\textsuperscript{{-1}}]}}$'
-    ylabel_ad = fr'$\mathbf{{a\textsubscript{{d}} [m\textsuperscript{{-1}}]}}$'
-    ylabel_rrs = fr'$\mathbf{{R\textsubscript{{rs}} [sr\textsuperscript{{-1}}]}}$'
+    cdom="cdom"
+    nap="nap"
+    rs="rs"
+    ylabel_ag = fr'$\mathbf{{a\textsubscript{{\mathit{cdom}}} [m\textsuperscript{{-1}}]}}$'        
+    ylabel_ad = fr'$\mathbf{{a\textsubscript{{\mathit{{nap}}}} [m\textsuperscript{{-1}}]}}$'
+    ylabel_rrs = fr'$\mathbf{{R\textsubscript{{\mathit{rs}}} [sr\textsuperscript{{-1}}]}}$'
 
+    PRODUCT_CURRENT = 'ag'
+    plabel_1 = f'{product_labels[PRODUCT_CURRENT]}'
+    plabel_2 = f'{product_units[PRODUCT_CURRENT]}'
+    ylabel_ag = fr'$\mathbf{{{plabel_1}{plabel_2}}}$'
+    
+    PRODUCT_CURRENT = 'ad'
+    plabel_1 = f'{product_labels[PRODUCT_CURRENT]}'
+    plabel_2 = f'{product_units[PRODUCT_CURRENT]}'
+    ylabel_ad = fr'$\mathbf{{{plabel_1}{plabel_2}}}$'
+    
+    PRODUCT_CURRENT = 'rrs'
+    plabel_1 = f'{product_labels[PRODUCT_CURRENT]}'
+    plabel_2 = f'{product_units[PRODUCT_CURRENT]}'
+    ylabel_rrs = fr'$\mathbf{{{plabel_1}{plabel_2}}}$'
+        
+    PRODUCT_CURRENT = 'aph'
+    plabel_1 = f'{product_labels[PRODUCT_CURRENT]}'
+    plabel_2 = f'{product_units[PRODUCT_CURRENT]}'
+    ylabel = fr'$\mathbf{{{plabel_1}{plabel_2}}}$'
+    
     # full_ax.set_ylabel(ylabel.replace(' ', '\ '), fontsize=20, labelpad=30) 
     # full_ax2 = full_ax.twinx()
     # full_ax2.set_ylabel(ylabel.replace(' ', '\ '), fontsize=20, labelpad=30) 
@@ -1159,7 +1223,7 @@ def plot_remote_insitu(y_remote, y_insitu, dictionary_of_matchups=None, products
     ag_resampled = dictionary_of_matchups['insitu_ag_resampled']
     ag_wvl_resampled = dictionary_of_matchups['insitu_ag_resampled_wvl']
     ag_wvl_resampled = ag_wvl_resampled[0,:]
-    
+    #sum(np.logical_and(~np.isnan(ag_resampled).all(axis=1),~np.isnan(dictionary_of_matchups['Rrs_retrieved_full']).all(axis=1)))
     aph_remote_estimate = (np.squeeze(np.asarray(y_remote_OG[0][:,:,y_remote_OG[1]["aph"]]))[index])
 
     current_product = 'aph'
@@ -1176,7 +1240,7 @@ def plot_remote_insitu(y_remote, y_insitu, dictionary_of_matchups=None, products
         axes      = [ax for axs in np.atleast_1d(axes) for ax in np.atleast_1d(axs)]
         full_ax  = fig.add_subplot(111, frameon=False)
         full_ax.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False, pad=10)
-        full_ax.set_xlabel(xlabel.replace(' ', '\ '), fontsize=20, labelpad=10)
+        full_ax.set_xlabel(xlabel.replace(' ', '\ '), fontsize=28, labelpad=10)
 
         for plotting_label_current in site_labels_of_interest:
             if plotting_label_current in dictionary_of_matchups['plotting_labels']:
@@ -1203,24 +1267,33 @@ def plot_remote_insitu(y_remote, y_insitu, dictionary_of_matchups=None, products
     
 
             if np.any(np.isnan(aph_resampled),axis=1)[index] or np.any(np.isnan(aph_remote_estimate)): continue
-            linewidth_truth=3.5
-            linewidth_insitu=linewidth_truth-0.75
-            linewidth_remote=linewidth_truth-1.5
+            linewidth_truth=8
+            linewidth_insitu=linewidth_truth-1
+            linewidth_remote=linewidth_truth-2
 
         
             ax0 = axes[plt_idx]
             
             ax0.plot(dictionary_of_matchups['insitu_Rrs_resampled_wvl'][0,:],dictionary_of_matchups['insitu_Rrs_resampled'][index,:],'c',label=fr'$\mathit{{In \ situ}}$',linewidth=linewidth_insitu)
             ax0.plot(dictionary_of_matchups['Rrs_retrieved_wvl'][0,:],dictionary_of_matchups['Rrs_retrieved'][index,:],'r',label='Remote',linewidth=linewidth_remote)
-            ax0.set_ylim([0,0.01])
+            ax0.set_ylim([0,0.015])
             ax0.set_xlim([400,700])
             ax0.grid()
+            ax0.set_yticks([0.0025, 0.0075,0.0125], minor=False)
+            ax0.set_yticks([0.005, 0.01, 0.015], minor=True)
+            ax0.yaxis.grid(True, which='major')
+            ax0.yaxis.grid(True, which='minor')
+            ax0.set_xticks([400, 500, 600,700], minor=False)
+            ax0.set_xticks([450, 550, 650], minor=True)
+            ax0.xaxis.grid(True, which='major')
+            ax0.xaxis.grid(True, which='minor')
+            
             ax0.set_xticklabels([])
             if plt_idx == 0: 
                 # ax0.legend(fontsize=26)
-                ax0.set_ylabel(ylabel_rrs.replace(' ', '\ '), fontsize=26, labelpad=30) 
+                ax0.set_ylabel(ylabel_rrs.replace(' ', '\ '), fontsize=34, labelpad=30) 
                 # ax.tick_params(axis='x', labelsize=8)
-                ax0.tick_params(axis='y', labelsize=22)
+                ax0.tick_params(axis='y', labelsize=26)
             else:
                 ax0.set_xticklabels([])
                 ax0.set_yticklabels([])            
@@ -1228,21 +1301,38 @@ def plot_remote_insitu(y_remote, y_insitu, dictionary_of_matchups=None, products
             
             plt_idx_1_5 = plt_idx+n_col
             ax = axes[plt_idx_1_5]
-            ax.plot(aph_wvl_resampled,aph_resampled[index,:], 'k',label='Measured',linewidth=linewidth_truth)
-            ax.plot(bands,aph_insitu_estimate,'c',label=fr'$\mathit{{In \ situ}}$',linewidth=linewidth_insitu)
-            ax.plot(bands,aph_remote_estimate,'r',label='Remote',linewidth=linewidth_remote)
+            ax.plot(aph_wvl_resampled,aph_resampled[index,:], 'k',label='Measured (a)',linewidth=linewidth_truth)
+            e="e"
+            ax.plot(bands,aph_insitu_estimate,'c',label=fr'$\mathit{{In \ situ}} \  (a^{e})$',linewidth=linewidth_insitu)
+            r="r"
+            ax.plot(bands,aph_remote_estimate,'r',label=fr'Remote ($a^{r}$)',linewidth=linewidth_remote)
             ax.set_ylim([0,0.6])
             ax.set_xlim([400,700])
             ax.grid()
             ax.set_xticklabels([])
 
             if plt_idx_1_5 == n_col: 
-                ax.legend(fontsize=24)
-                ax.set_ylabel(ylabel.replace(' ', '\ '), fontsize=26, labelpad=30) 
-                ax.tick_params(axis='y', labelsize=22)
+                leg = ax.legend(fontsize=26,frameon=True)
+                leg.get_frame().set_edgecolor('m')
+                leg.get_frame().set_linewidth(2)
+
+                ax.set_ylabel(ylabel.replace(' ', '\ '), fontsize=34, labelpad=30) 
+                ax.tick_params(axis='y', labelsize=26)
             else:
                 ax.set_xticklabels([])
                 ax.set_yticklabels([])        
+                
+            # ax.set_ylim([0,1.5])
+            # ax.set_xlim([400,700])
+            ax.set_yticks([0.2, 0.4, 0.6], minor=True)
+            ax.set_yticks([0.1, 0.3, 0.5], minor=False)
+            ax.yaxis.grid(True, which='major')
+            ax.yaxis.grid(True, which='minor')
+            ax.set_xticks([400, 500, 600,700], minor=False)
+            ax.set_xticks([450, 550, 650], minor=True)
+            ax.xaxis.grid(True, which='major')
+            ax.xaxis.grid(True, which='minor')
+            
             #####################
             #ax2=ax.twinx()
             plt_idx_2=plt_idx_1_5+n_col
@@ -1277,21 +1367,24 @@ def plot_remote_insitu(y_remote, y_insitu, dictionary_of_matchups=None, products
 
             CDOM_insitu,SCDOM_insitu = convert_spectral_cdom_to_point_slope(bands_ad_ag,ag_insitu_estimate,reference_CDOM_wavelength=443,spectral_min_max=[400,700],allowed_error=allowed_error)
             CDOM_remote,SCDOM_remote = convert_spectral_cdom_to_point_slope(bands_ad_ag,ag_remote_estimate,reference_CDOM_wavelength=443,spectral_min_max=[400,700],allowed_error=allowed_error)
-            font_cdom=18
+            font_cdom=22
             CDOM_truth_rounded=np.round(ag_measurement,1)
-            ax2.text(463,2.2,f'ag(443) : (CDOM) : S-CDOM',color='k',fontsize=font_cdom)
-            ax2.text(505,2.05,f'{CDOM_truth:.2f} : ({CDOM_truth_rounded:.1f}) : {SCDOM_truth:.4f}',color='k',fontsize=font_cdom)
-            ax2.text(505,1.9,f'{CDOM_insitu:.2f} : ({cdom_insitu_estimate:.1f}) : {SCDOM_insitu:.4f}',color='c',fontsize=font_cdom)
-            ax2.text(505,1.75,f'{CDOM_remote:.2f} : ({cdom_remote_estimate:.1f}) : {SCDOM_remote:.4f}',color='r',fontsize=font_cdom)
+            plabel = product_labels['ag443']
+            plabel = f'{plabel}'
+            xlabel = fr'$\mathbf{{ {plabel} }}$  : (CDOM) : S-CDOM'
+            ax2.text(426,2.26,xlabel,color='k',fontsize=font_cdom-3.5,fontweight='extra bold')
+            ax2.text(472,2.05,f'{CDOM_truth:.2f} : ({CDOM_truth_rounded:.1f}) : {SCDOM_truth:.4f}',color='k',fontsize=font_cdom,fontweight='extra bold')
+            ax2.text(472,1.85,f'{CDOM_insitu:.2f} : ({cdom_insitu_estimate:.1f}) : {SCDOM_insitu:.4f}',color='c',fontsize=font_cdom,fontweight='extra bold')
+            ax2.text(472,1.65,f'{CDOM_remote:.2f} : ({cdom_remote_estimate:.1f}) : {SCDOM_remote:.4f}',color='r',fontsize=font_cdom,fontweight='extra bold')
 
 
 
     
             if plt_idx_2 == 2*n_col: 
                 # ax2.legend()
-                ax2.set_ylabel(ylabel_ag.replace(' ', '\ '), fontsize=26, labelpad=30) 
+                ax2.set_ylabel(ylabel_ag.replace(' ', '\ '), fontsize=34, labelpad=30) 
                 ax2.set_xticklabels([])
-                ax2.tick_params(axis='y', labelsize=22)
+                ax2.tick_params(axis='y', labelsize=26)
             else:
                 ax2.set_xticklabels([])
                 ax2.set_yticklabels([])
@@ -1300,6 +1393,15 @@ def plot_remote_insitu(y_remote, y_insitu, dictionary_of_matchups=None, products
             ax2.set_ylim([0,2.5])
             ax2.set_xlim([400,700])
             ax2.grid()
+            ax2.set_yticks([1.0, 2.0], minor=True)
+            ax2.set_yticks([0.5,1.5,2.5], minor=False)
+            ax2.yaxis.grid(True, which='major')
+            ax2.yaxis.grid(True, which='minor')
+            ax2.set_xticks([400, 500, 600,700], minor=False)
+            ax2.set_xticks([450, 550, 650], minor=True)
+            ax2.xaxis.grid(True, which='major')
+            ax2.xaxis.grid(True, which='minor')
+            
             #####################
     
             plt_idx_3=plt_idx_2+n_col
@@ -1321,26 +1423,38 @@ def plot_remote_insitu(y_remote, y_insitu, dictionary_of_matchups=None, products
             NAP_truth,SNAP_truth = convert_spectral_cdom_to_point_slope(ad_wvl_resampled,ad_resampled[index,:],reference_CDOM_wavelength=443,spectral_min_max=[400,700],allowed_error=allowed_error)
             NAP_insitu,SNAP_insitu = convert_spectral_cdom_to_point_slope(bands_ad_ag,ad_insitu_estimate,reference_CDOM_wavelength=443,spectral_min_max=[400,700],allowed_error=allowed_error)
             NAP_remote,SNAP_remote = convert_spectral_cdom_to_point_slope(bands_ad_ag,ad_remote_estimate,reference_CDOM_wavelength=443,spectral_min_max=[400,700],allowed_error=allowed_error)
-            font_cdom=18
-            ax3.text(508,1.3,f'ad(443) : S-NAP',color='k',fontsize=font_cdom)
-            ax3.text(535,1.2,f'{NAP_truth:.2f} : {SNAP_truth:.4f}',color='k',fontsize=font_cdom)
-            ax3.text(535,1.1,f'{NAP_insitu:.2f} :  {SNAP_insitu:.4f}',color='c',fontsize=font_cdom)
-            ax3.text(535,1.0,f'{NAP_remote:.2f} :  {SNAP_remote:.4f}',color='r',fontsize=font_cdom)
+            # font_cdom=18
+            plabel = product_labels['ad443']
+            plabel = f'{plabel}'
+            xlabel = fr'$\mathbf{{ {plabel} }}$  :  S-NAP'          
+            ax3.text(446,1.34,xlabel,color='k',fontsize=font_cdom,fontweight='extra bold')
+            ax3.text(490,1.2,f'{NAP_truth:.2f} : {SNAP_truth:.4f}',color='k',fontsize=font_cdom,fontweight='extra bold')
+            ax3.text(490,1.1,f'{NAP_insitu:.2f} :  {SNAP_insitu:.4f}',color='c',fontsize=font_cdom,fontweight='extra bold')
+            ax3.text(490,1.0,f'{NAP_remote:.2f} :  {SNAP_remote:.4f}',color='r',fontsize=font_cdom,fontweight='extra bold')
             
             
             if plt_idx_3 == 3*n_col: 
-                ax3.set_ylabel(ylabel_ad.replace(' ', '\ '), fontsize=26, labelpad=30) 
-                ax3.tick_params(axis='y', labelsize=22)
+                ax3.set_ylabel(ylabel_ad.replace(' ', '\ '), fontsize=34, labelpad=30) 
+                ax3.tick_params(axis='y', labelsize=26)
             else:
                 ax3.set_yticklabels([])
                 
-            ax3.tick_params(axis='x', labelsize=22)
+            ax3.tick_params(axis='x', labelsize=26)
 
             ax3.set_ylim([0,1.5])
             ax3.set_xlim([400,700])
-            ax3.grid()
+            ax3.set_yticks([0.25, 0.75, 1.25], minor=False)
+            ax3.set_yticks([0.5, 1.0, 1.5], minor=True)
+            ax3.yaxis.grid(True, which='major')
+            ax3.yaxis.grid(True, which='minor')
+            ax3.set_xticks([400, 500, 600,700], minor=False)
+            ax3.set_xticks([450, 550, 650], minor=True)
+            ax3.xaxis.grid(True, which='major')
+            ax3.xaxis.grid(True, which='minor')
             
-            ax0.set_title(dictionary_of_matchups['plotting_labels'][index][0].replace('_',''),fontsize=24)
+            # ax3.grid()
+            
+            ax0.set_title(dictionary_of_matchups['plotting_labels'][index][0].replace('_',''),fontsize=30-site_label_set*4)
             plt_idx=plt_idx+1
             # if plt_idx < 24: ax.set_xticks([])
             counter = counter+1

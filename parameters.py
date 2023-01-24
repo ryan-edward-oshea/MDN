@@ -10,7 +10,7 @@ parser.add_argument("filename",    nargs  ="?",          help="CSV file containi
 parser.add_argument("--model_loc", default="Weights",    help="Location of trained model weights")
 # parser.add_argument("--data_loc",  default="/media/brandon/NASA/Data/Insitu",  help="Location of in situ data")
 # parser.add_argument("--sim_loc",   default="/media/brandon/NASA/Data/Simulated", help="Location of simulated data")
-parser.add_argument("--data_loc",  default="/home/ryanoshea/in_situ_database/Working_in_situ_dataset/in_situ_data/",    help="Location of in situ data") #Working_in_situ_dataset/in_situ_data" in_situ_brandon_Mike
+parser.add_argument("--data_loc",  default="/home/ryanoshea/in_situ_database/Working_in_situ_dataset/Augmented_Gloria_V4/",    help="Location of in situ data") #Working_in_situ_dataset/in_situ_data" in_situ_brandon_Mike
 parser.add_argument("--sim_loc",   default="D:/Data/Simulated", help="Location of simulated data")
 parser.add_argument("--n_redraws", default=50,     type=int,   help="Number of plot redraws during training (i.e. updates plot every n_iter / n_redraws iterations); only used with --plot_loss.")
 parser.add_argument("--n_rounds",  default=1,     type=int,   help="Number of models to fit, with median output as the final estimate")

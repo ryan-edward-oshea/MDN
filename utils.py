@@ -418,7 +418,7 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_boo
             required_wvl = np.array(required_wvl).flatten()
             assert(dloc.exists()), (f'Key {name} does not exist at {loc} ({dloc})') 
 
-            data = np.loadtxt(dloc, delimiter=',', dtype=float if name not in ['../Dataset', '../meta', '../datetime', '../folder_name', '../latlon'] else str, comments=None)            
+            data = np.loadtxt(dloc, delimiter=',', dtype=float if name not in ['../Dataset','../dataset', '../meta', '../datetime', '../folder_name', '../latlon'] else str, comments=None)            
            
             if name in ['../latlon']: data =  np.apply_along_axis(lambda d: d[0] + ',' + d[1], 1, data)
             if len(data.shape) == 1: data = data[:, None]
@@ -430,13 +430,13 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_boo
                     new_data = [[np.nan]*len(data)] * len(required_wvl)
                     wvls  = np.loadtxt(Path(loc).joinpath(f'{dloc.stem}_wvl.csv'), delimiter=',')[:,None]
                     idxs  = np.abs(wvls - np.atleast_2d(required_wvl)).argmin(0)
-                    valid = np.abs(wvls - np.atleast_2d(required_wvl)).min(0) < 2
+                    valid = np.abs(wvls - np.atleast_2d(required_wvl)).min(0) < 5 #2
 
                     for j, (i, v) in enumerate(zip(idxs, valid)):
                         if v: new_data[j] = data[:, i]
                     data = np.array(new_data).T
                 else:
-                    data = data[:, get_valid(dloc.stem, loc, required_wvl)]
+                    data = data[:, get_valid(dloc.stem, loc, required_wvl,margin=4)]
 
             if 'cdom' in name and dloc.stem == 'ag':
                 data = data[:, find_wavelength(443, required_wvl)].flatten()[:, None]
@@ -463,7 +463,15 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_boo
         # First, validate available wavelengths are within the margin of the required wavelengths
         valid = np.array([True] * len(required_wvl))
         if len(wvls) != len(required_wvl):
-            valid = np.abs(wvls - np.atleast_2d(required_wvl)).min(1) <= margin
+            # valid = np.abs(wvls - np.atleast_2d(required_wvl)).min(1) <= margin
+            # valid = np.abs(wvls - np.atleast_2d(required_wvl)).min(1) <= margin
+            valid_bool = []
+            for required_wvl_i in required_wvl:
+                wvl_diff = [i.item() for i in np.abs(wvls - required_wvl_i)]
+                wvl_diff_bool = [wvl_diff_i < margin for wvl_diff_i in wvl_diff]
+                valid_bool.append([wvl_diff_bool_i if np.argmin(wvl_diff) == i else False for  i,wvl_diff_bool_i in enumerate(wvl_diff_bool) ])
+            
+            valid = np.any(np.array(valid_bool),axis=0)
             assert(valid.sum() == len(required_wvl)), [wvls[valid].flatten(), required_wvl]
 
         # Then, ensure the order of the available wavelengths are the same as the required
@@ -474,7 +482,7 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_boo
 
     locs = [Path(loc).resolve() for loc in np.atleast_1d(locs)]
     print('\n-------------------------')
-    print(f'Loading data for sensor {locs[0].parts[-1]}, and targets {[v.replace("../","") for v in keys[1:]]}')
+    print(f'Loading data for sensor {locs[0].parts[-1]}, and targets {[v.replace("../","") for v in keys[2:]]}')
     if allow_missing:
         print('Allowing data regardless of whether all bands exist')
 
@@ -491,9 +499,13 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_boo
                 print(f'Skipping dataset {loc}: missing all features')
                 continue
 
+            if '../dataset' in keys: l_data  += list(zip( list([ 'SeaBASS2' if 'SeaBASS2'  in  str(i.item())  else 'SeaBASS'  if '""'  in  str(i.item()) else  str(i.item())  for i in loc_data[keys.index('../dataset')]]) ,np.arange(len(loc_data[keys.index('../dataset')]))))
+
             x_data  += [loc_data.pop(0)]
+            if '../dataset' in keys: dataset_data  = [loc_data.pop(0)]
             y_data  += [loc_data]
-            l_data  += list(zip([loc.parent.name] * len(x_data[-1]), np.arange(len(x_data[-1]))))
+            if '../dataset' not in keys: l_data  += list(zip([loc.parent.name] * len(x_data[-1]), np.arange(len(x_data[-1])))) #if '../dataset' not in keys else
+            
 
         except Exception as e:
             # assert(0), e
@@ -507,7 +519,7 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_boo
 
     # Determine the number of features each key should have
     slices = []
-    for i, key in enumerate(keys[1:]):
+    for i, key in enumerate(keys[2:]):
         shapes = [y[i].shape[1] for y in y_data]
         slices.append(max(shapes))
 
@@ -524,7 +536,7 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_boo
             drop.append(i)
 
     slices = np.cumsum([0] + [s for i,s in enumerate(slices) if i not in drop])
-    keys   = [k for i,k in enumerate(keys[1:]) if i not in drop]
+    keys   = [k for i,k in enumerate(keys[2:]) if i not in drop]
     for y in y_data:
         y = [z for i,z in enumerate(y) if i not in drop]
 
@@ -576,7 +588,7 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_boo
     return x_data, y_data, slices, l_data
 
 
-def _filter_invalid(x_data, y_data, slices, allow_nan_inp=False, allow_nan_out=False, other=[], min_in_out_val = 0):
+def _filter_invalid(x_data, y_data, slices, allow_nan_inp=False, allow_nan_out=False, other=[], min_in_out_val = 0,datasets_to_remove=None):
     ''' 
     Filter the given data to only include samples which are valid. By 
     default, valid samples include all which are not nan, and greater 
@@ -594,6 +606,17 @@ def _filter_invalid(x_data, y_data, slices, allow_nan_inp=False, allow_nan_out=F
     bands, can be filtered so they end up with the same samples relative to
     each other).
     '''
+    #
+    remove_datasets_bool = None
+    if 'dataset' in slices.keys():
+        datasets = y_data[:,slices['dataset']]
+        y_data = np.delete(y_data,slices['dataset'],1)
+        y_data = y_data.astype(np.float)
+        if datasets_to_remove is not None:
+            remove_datasets_bool = np.squeeze(datasets != datasets_to_remove) 
+
+        
+    
     
     # Allow multiple sets to be given, and align them all to the same sample subset
     if type(x_data) is not list: x_data = [x_data]
@@ -622,6 +645,7 @@ def _filter_invalid(x_data, y_data, slices, allow_nan_inp=False, allow_nan_out=F
             subset[np.isnan(subset)] = -999.
             subset[np.logical_or(subset <= min_in_out_val, not i and (subset >= 10))] = np.nan 
             has_nan = np.any if (i and allow_nan_out) or (not i and allow_nan_inp) else np.all 
+            valid = valid if remove_datasets_bool is None else np.logical_and(valid,remove_datasets_bool)
             valid   = np.logical_and(valid, has_nan(np.isfinite(subset), 1))
 
     x_data = [x[valid] for x in x_data]
@@ -653,12 +677,12 @@ def get_data(args):
             products = ['chl', 'tss', 'cdom', 'ad', 'ag', 'aph']# + ['a*ph', 'apg', 'a'] 
 
         data_folder = []
-        data_keys   = ['Rrs']
+        data_keys   = ['Rrs','../dataset']
         data_path   = Path(args.data_loc)
         get_dataset = lambda path, p: Path(path.as_posix().replace(f'/{sensor}','').replace(f'/{p}.csv','')).stem
 
         for product in products:
-            if product in ['chl', 'tss', 'cdom','secchi', 'pc','Fuco','Peri','waterTemperature','salinity','turbidity','spim','spom','depth','conductivity','microcystin','Scdom443','Snap443','nap','latlon']:
+            if product in ['chl', 'tss', 'cdom','secchi', 'pc','Fuco','Peri','waterTemperature','salinity','turbidity','spim','spom','depth','conductivity','microcystin','Scdom443','Snap443','nap','latlon','dataset']:
                 product = f'../{product}'
         
             # Find all datasets with the given product available
@@ -705,9 +729,9 @@ def get_data(args):
 
     # if -nan IS in the sensor label: do not filter samples; allow all, regardless of nan composition
     if 'latlon' in args.product.split(','): 
-        (x_data, *_), (y_data, *_), (sources, latlons) = _filter_invalid(x_data, y_data[:,:-1].astype(float) if 'latlon' in args.product.split(',') else y_data, slices, other=[sources,y_data[:,-1]] if 'latlon' in args.product.split(',') else [sources] ,allow_nan_inp= args.allow_nan_inp or '-nan'  in args.sensor, allow_nan_out= args.allow_nan_out,min_in_out_val=args.min_in_out_val)
+        (x_data, *_), (y_data, *_), (sources, latlons) = _filter_invalid(x_data, y_data[:,:-1].astype(float) if 'latlon' in args.product.split(',') else y_data, slices, other=[sources,y_data[:,-1]] if 'latlon' in args.product.split(',') else [sources] ,allow_nan_inp= args.allow_nan_inp or '-nan'  in args.sensor, allow_nan_out= args.allow_nan_out,min_in_out_val=args.min_in_out_val,datasets_to_remove=args.removed_dataset)
     else:
-        (x_data, *_), (y_data, *_), (sources, *_) = _filter_invalid(x_data, y_data[:,:-1].astype(float) if 'latlon' in args.product.split(',') else y_data, slices, other=[sources,y_data[:,-1]] if 'latlon' in args.product.split(',') else [sources] ,allow_nan_inp= args.allow_nan_inp or '-nan'  in args.sensor, allow_nan_out= args.allow_nan_out,min_in_out_val=args.min_in_out_val)
+        (x_data, *_), (y_data, *_), (sources, *_) = _filter_invalid(x_data, y_data[:,:-1].astype(float) if 'latlon' in args.product.split(',') else y_data, slices, other=[sources,y_data[:,-1]] if 'latlon' in args.product.split(',') else [sources] ,allow_nan_inp= args.allow_nan_inp or '-nan'  in args.sensor, allow_nan_out= args.allow_nan_out,min_in_out_val=args.min_in_out_val,datasets_to_remove=args.removed_dataset)
 
     print('\nFinal counts:')
     print('\n'.join([f'\tN={num:>5} | {loc}' for loc, num in zip(*np.unique(sources[:, 0], return_counts=True))]))
