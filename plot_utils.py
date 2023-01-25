@@ -345,7 +345,7 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
             #y_test=y_test[:,[ i in get_sensor_bands('HICO-aph', args) for i in  get_sensor_bands(sensor, args)]]
         if args.use_HICO_aph and (products[0]=='ad' or products[0]=='ag'): 
                 product_bands = {
-                    'default' :  [get_sensor_bands(f'{sensor}-adag', args)[0],get_sensor_bands(f'{sensor}-adag', args)[2],get_sensor_bands(f'{sensor}-adag', args)[4]] #[415,444,478,535,564,593,621]#list(get_sensor_bands('HICO-adag', args))
+                    'default' :  [get_sensor_bands(f'{sensor}-adag', args)[1],get_sensor_bands(f'{sensor}-adag', args)[4],get_sensor_bands(f'{sensor}-adag', args)[6]] #[415,444,478,535,564,593,621]#list(get_sensor_bands('HICO-adag', args))
                 }
                 target     = [closest_wavelength(w, bands if not args.use_HICO_aph else get_sensor_bands(f'{sensor}-adag', args)) for w in product_bands.get(products[0], product_bands['default'])]
                 plot_label_aph = [w in target for w in get_sensor_bands(f'{sensor}-adag', args)]
