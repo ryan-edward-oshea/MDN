@@ -345,7 +345,7 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
             #y_test=y_test[:,[ i in get_sensor_bands('HICO-aph', args) for i in  get_sensor_bands(sensor, args)]]
         if args.use_HICO_aph and (products[0]=='ad' or products[0]=='ag'): 
                 product_bands = {
-                    'default' :  [get_sensor_bands(f'{sensor}-adag', args)[1],get_sensor_bands(f'{sensor}-adag', args)[4],get_sensor_bands(f'{sensor}-adag', args)[6]] #[415,444,478,535,564,593,621]#list(get_sensor_bands('HICO-adag', args))
+                    'default' :  list(get_sensor_bands('HICO-adag', args)) #[get_sensor_bands(f'{sensor}-adag', args)[1],get_sensor_bands(f'{sensor}-adag', args)[4],get_sensor_bands(f'{sensor}-adag', args)[6]] #[415,444,478,535,564,593,621]#list(get_sensor_bands('HICO-adag', args))
                 }
                 target     = [closest_wavelength(w, bands if not args.use_HICO_aph else get_sensor_bands(f'{sensor}-adag', args)) for w in product_bands.get(products[0], product_bands['default'])]
                 plot_label_aph = [w in target for w in get_sensor_bands(f'{sensor}-adag', args)]
@@ -408,7 +408,7 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
 
     # plot_order = [p for p in plot_order if p in benchmarks]
     fig_size   = 5
-    n_col      = max(n_col, sum(plot_label))
+    n_col      = max(n_col, sum(plot_label_aph if args.use_HICO_aph and (products[0]=='ad' or products[0]=='ag') else plot_label )) 
     n_row      = max(1,int(not plot_bands) + int(0.5 + len(plot_order) / (1 if plot_bands else n_col)) - int(not plot_bands))
     if isinstance(plot_order, dict): n_row = 3
     if plot_bands:
