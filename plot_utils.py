@@ -345,7 +345,7 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
             #y_test=y_test[:,[ i in get_sensor_bands('HICO-aph', args) for i in  get_sensor_bands(sensor, args)]]
         if args.use_HICO_aph and (products[0]=='ad' or products[0]=='ag'): 
                 product_bands = {
-                    'default' :  list(get_sensor_bands('HICO-adag', args)) #[get_sensor_bands(f'{sensor}-adag', args)[1],get_sensor_bands(f'{sensor}-adag', args)[4],get_sensor_bands(f'{sensor}-adag', args)[6]] #[415,444,478,535,564,593,621]#list(get_sensor_bands('HICO-adag', args))
+                    'default' :  [get_sensor_bands(f'{sensor}-adag', args)[1],get_sensor_bands(f'{sensor}-adag', args)[4],get_sensor_bands(f'{sensor}-adag', args)[6]]  # list(get_sensor_bands('HICO-adag', args)) ##[415,444,478,535,564,593,621]#list(get_sensor_bands('HICO-adag', args))
                 }
                 target     = [closest_wavelength(w, bands if not args.use_HICO_aph else get_sensor_bands(f'{sensor}-adag', args)) for w in product_bands.get(products[0], product_bands['default'])]
                 plot_label_aph = [w in target for w in get_sensor_bands(f'{sensor}-adag', args)]
@@ -942,8 +942,8 @@ def plot_remote_insitu(y_remote, y_insitu, dictionary_of_matchups=None, products
         'aph' :  'a_{\mathit{ph}}',
         'ad' :  'a_{\mathit{nap}}',
         'ag' : 'a_{\mathit{cdom}}',
-        'ag443' : 'a_{\mathit{cdom}(443)}',
-        'ad443' : 'a_{\mathit{nap}(443)}',
+        'ag443' : 'a_{\mathit{cdom}(440)}',
+        'ad443' : 'a_{\mathit{nap}(440)}',
 
         'tss' : 'TSS',
         'rrs' : 'R_{\mathit{rs}}',
@@ -1037,7 +1037,7 @@ def plot_remote_insitu(y_remote, y_insitu, dictionary_of_matchups=None, products
             ax.legend(loc='lower right', prop={'weight':'bold', 'size': 16})
 
         add_identity(ax, ls='--', color='k', zorder=20)
-        add_stats_box(ax, y_insitu.flatten()[valid], y_remote.flatten()[valid],metrics=[slope,r_squared])
+        add_stats_box(ax, y_insitu.flatten()[valid], y_remote.flatten()[valid],metrics=[slope,r_squared,mdsa])
 
         ax.tick_params(labelsize=12)
         ax.grid('on', alpha=0.3)

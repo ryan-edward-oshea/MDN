@@ -482,7 +482,7 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_boo
 
     locs = [Path(loc).resolve() for loc in np.atleast_1d(locs)]
     print('\n-------------------------')
-    print(f'Loading data for sensor {locs[0].parts[-1]}, and targets {[v.replace("../","") for v in keys[2:]]}')
+    print(f'Loading data for sensor {locs[0].parts[-1]}, and targets {[v.replace("../","") for v in keys[4:]]}')
     if allow_missing:
         print('Allowing data regardless of whether all bands exist')
 
@@ -501,8 +501,13 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_boo
 
             if '../dataset' in keys: l_data  += list(zip( list([ 'SeaBASS2' if 'SeaBASS2'  in  str(i.item())  else 'SeaBASS'  if '""'  in  str(i.item()) else  str(i.item())  for i in loc_data[keys.index('../dataset')]]) ,np.arange(len(loc_data[keys.index('../dataset')]))))
 
+            # if args.removed_dataset is not None : datasets = [d for d in datasets if  d not in args.removed_dataset.split(',')]
+
             x_data  += [loc_data.pop(0)]
             if '../dataset' in keys: dataset_data  = [loc_data.pop(0)]
+            if '../lat' in keys: lat_data  = [loc_data.pop(0)]
+            if '../lon' in keys: lon_data  = [loc_data.pop(0)]
+            lat_lon_data = list(zip(lat_data[0].tolist(),lon_data[0].tolist()))
             y_data  += [loc_data]
             if '../dataset' not in keys: l_data  += list(zip([loc.parent.name] * len(x_data[-1]), np.arange(len(x_data[-1])))) #if '../dataset' not in keys else
             
@@ -519,7 +524,7 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_boo
 
     # Determine the number of features each key should have
     slices = []
-    for i, key in enumerate(keys[2:]):
+    for i, key in enumerate(keys[4:]):
         shapes = [y[i].shape[1] for y in y_data]
         slices.append(max(shapes))
 
@@ -536,11 +541,12 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_boo
             drop.append(i)
 
     slices = np.cumsum([0] + [s for i,s in enumerate(slices) if i not in drop])
-    keys   = [k for i,k in enumerate(keys[2:]) if i not in drop]
+    keys   = [k for i,k in enumerate(keys[4:]) if i not in drop]
     for y in y_data:
         y = [z for i,z in enumerate(y) if i not in drop]
 
     # Combine everything together
+    if lat_lon_data is not None: np.vstack(lat_lon_data)
     l_data = np.vstack(l_data)
     x_data = np.vstack(x_data)
 
@@ -585,7 +591,7 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_boo
                 print(f'Removed {remove.sum()} / {len(remove)} samples due to poor quality {product} spectra')
                 assert((~remove).sum()), f'All data removed due to {product} spectra quality...'
 
-    return x_data, y_data, slices, l_data
+    return x_data, y_data, slices, l_data, lat_lon_data
 
 
 def _filter_invalid(x_data, y_data, slices, allow_nan_inp=False, allow_nan_out=False, other=[], min_in_out_val = 0,datasets_to_remove=None):
@@ -608,12 +614,18 @@ def _filter_invalid(x_data, y_data, slices, allow_nan_inp=False, allow_nan_out=F
     '''
     #
     remove_datasets_bool = None
-    if 'dataset' in slices.keys():
-        datasets = y_data[:,slices['dataset']]
-        y_data = np.delete(y_data,slices['dataset'],1)
-        y_data = y_data.astype(np.float)
-        if datasets_to_remove is not None:
-            remove_datasets_bool = np.squeeze(datasets != datasets_to_remove) 
+    # if 'dataset' in slices.keys():
+        # datasets = y_data[:,slices['dataset']]
+        # y_data = np.delete(y_data,slices['dataset'],1)
+        # y_data = y_data.astype(np.float)
+    
+    if datasets_to_remove is not None:
+        datasets_to_remove = datasets_to_remove.split(',')
+        datasets = [i[0] for i in other[0]]
+        # remove_datasets_bool = np.squeeze(np.array(datasets) != datasets_to_remove) 
+        remove_datasets_bool = [ i not in datasets_to_remove for i in datasets]
+        
+    # Only saves lat lon with atleast one associated other measurement
 
         
     
@@ -677,7 +689,7 @@ def get_data(args):
             products = ['chl', 'tss', 'cdom', 'ad', 'ag', 'aph']# + ['a*ph', 'apg', 'a'] 
 
         data_folder = []
-        data_keys   = ['Rrs','../dataset']
+        data_keys   = ['Rrs','../dataset','../lat','../lon']
         data_path   = Path(args.data_loc)
         get_dataset = lambda path, p: Path(path.as_posix().replace(f'/{sensor}','').replace(f'/{p}.csv','')).stem
 
@@ -706,7 +718,7 @@ def get_data(args):
     assert(len(data_keys)),  f'No variables found for {products} within {data_path}/*/{sensor}'
     
     sensor_loc = [data_path.joinpath(f, sensor) for f in data_folder]
-    x_data, y_data, slices, sources = _load_datasets(data_keys, sensor_loc, bands, allow_missing=args.allow_missing or ('-nan' in args.sensor) or (getattr(args, 'align', None) is not None),filter_ad_ag_bool=args.filter_ad_ag,args=args)
+    x_data, y_data, slices, sources, lat_lon = _load_datasets(data_keys, sensor_loc, bands, allow_missing=args.allow_missing or ('-nan' in args.sensor) or (getattr(args, 'align', None) is not None),filter_ad_ag_bool=args.filter_ad_ag,args=args)
 
     # Hydrolight simulated CDOM is incorrectly scaled
     if using_feature(args, 'sim') and 'cdom' in slices:
@@ -731,7 +743,7 @@ def get_data(args):
     if 'latlon' in args.product.split(','): 
         (x_data, *_), (y_data, *_), (sources, latlons) = _filter_invalid(x_data, y_data[:,:-1].astype(float) if 'latlon' in args.product.split(',') else y_data, slices, other=[sources,y_data[:,-1]] if 'latlon' in args.product.split(',') else [sources] ,allow_nan_inp= args.allow_nan_inp or '-nan'  in args.sensor, allow_nan_out= args.allow_nan_out,min_in_out_val=args.min_in_out_val,datasets_to_remove=args.removed_dataset)
     else:
-        (x_data, *_), (y_data, *_), (sources, *_) = _filter_invalid(x_data, y_data[:,:-1].astype(float) if 'latlon' in args.product.split(',') else y_data, slices, other=[sources,y_data[:,-1]] if 'latlon' in args.product.split(',') else [sources] ,allow_nan_inp= args.allow_nan_inp or '-nan'  in args.sensor, allow_nan_out= args.allow_nan_out,min_in_out_val=args.min_in_out_val,datasets_to_remove=args.removed_dataset)
+        (x_data, *_), (y_data, *_), (sources, lat_lon) = _filter_invalid(x_data, y_data[:,:-1].astype(float) if 'latlon' in args.product.split(',') else y_data, slices, other=[sources,y_data[:,-1]] if 'latlon' in args.product.split(',') else [sources,lat_lon] ,allow_nan_inp= args.allow_nan_inp or '-nan'  in args.sensor, allow_nan_out= args.allow_nan_out,min_in_out_val=args.min_in_out_val,datasets_to_remove=args.removed_dataset)
 
     print('\nFinal counts:')
     print('\n'.join([f'\tN={num:>5} | {loc}' for loc, num in zip(*np.unique(sources[:, 0], return_counts=True))]))
@@ -743,7 +755,7 @@ def get_data(args):
         y_data = _fix_tchl(y_data, sources, slices, data_path)
     if 'latlon' in args.product.split(','): 
         return x_data, y_data, slices, sources, latlons
-    return x_data, y_data, slices, sources
+    return x_data, y_data, slices, sources, lat_lon
 
 
 def _fix_tchl(y_data, sources, slices, data_path, debug=False):

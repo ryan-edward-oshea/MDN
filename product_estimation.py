@@ -65,9 +65,9 @@ def get_estimates(args, x_train=None, y_train=None, x_test=None, y_test=None, ou
         np.random.seed(curr_round_seed)
 
         # 75% of rows used in bagging
-        if using_feature(args, 'bagging') and x_train is not None and args.n_rounds > 1:
+        #if using_feature(args, 'bagging') and x_train is not None and args.n_rounds > 1:
             #(x_train, y_train), (x_valid, y_valid), train_idxs, test_idxs  = split_data(x_full, y_full, n_train=0.75, seed=curr_round_seed) 
-            print("bagging?")
+            #print("bagging?")
 
         datasets = {k: dict(zip(['x','y'], v)) for k,v in {
             'train' : [x_train, y_train],
@@ -282,7 +282,7 @@ def main(kwargs,plot_matchups=False):
 
     # Save data used with the given args
     elif args.save_data:
-        x_data, y_data, slices, locs = get_data(args)
+        x_data, y_data, slices, locs, lat_lon_data = get_data(args)
 
         valid  = np.any(np.isfinite(x_data), 1) # Remove samples which are completely nan
         x_data = x_data[valid].astype(str)
@@ -311,7 +311,7 @@ def main(kwargs,plot_matchups=False):
             
             bands   = get_sensor_bands(args.sensor, args)
             n_train = 0.75 if args.dataset != 'sentinel_paper' else 1000
-            x_data, y_data, slices, locs = get_data(args)
+            x_data, y_data, slices, locs, lat_lon_data = get_data(args)
 
             #(x_train, y_train), (x_test, y_test), train_idxs, test_idxs = split_data(x_data, y_data, n_train=n_train, seed=args.seed)
 
@@ -382,7 +382,7 @@ def main(kwargs,plot_matchups=False):
         
         bands   = get_sensor_bands(args.sensor, args)
         n_train = 0.5 if args.dataset != 'sentinel_paper' else 1000
-        x_data, y_data, slices, locs = get_data(args)
+        x_data, y_data, slices, locs, lat_lon_data = get_data(args)
         # input('Hold')
         (x_train, y_train), (x_test, y_test), train_idxs, test_idxs = split_data(x_data, y_data, n_train=n_train, seed=args.seed)
 
@@ -433,9 +433,10 @@ def main(kwargs,plot_matchups=False):
             latlons_df = pd.DataFrame(latlons_df)
             latlons_df2 = pd.DataFrame(latlons_df['latlons'].to_list(), columns=['lat','lon']).to_csv('lat_lons.csv',index=False)
         else:
-            x_data, y_data, slices, locs = get_data(args)
+            x_data, y_data, slices, locs, lat_lon_data = get_data(args)
 
-
+        lat_lon_data = np.squeeze(lat_lon_data)
+        np.savetxt("lat_lon_data.csv",lat_lon_data,delimiter = ",")
         products   = args.product.split(',') 
         plot_histogram(y_data,products,slices,locs)
         get_estimates(args, x_data, y_data, output_slices=slices, dataset_labels=locs[:,0])
