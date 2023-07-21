@@ -1,4 +1,4 @@
-from .metrics import slope, sspb, mdsa, rmsle, r_squared
+from .metrics import slope, sspb, mdsa, rmsle, r_squared, N
 from .meta import get_sensor_label,get_sensor_bands
 from .utils import closest_wavelength, ignore_warnings
 from collections import defaultdict as dd 
@@ -53,7 +53,7 @@ def create_stats_HPC(y_true, y_est, metrics=[mdsa, sspb, slope],label=None):
 def _create_metric(metric, y_true, y_est, longest=None, label=None):
     ''' Create a position-aligned string which shows the performance via a single metric '''
     # if label == None:   label = metric.__name__.replace('SSPB', '\\beta').replace('MdSA', '\\varepsilon\\thinspace').replace('Slope','S\\thinspace')
-    if label == None:   label = metric.__name__.replace('SSPB', 'Bias').replace('MdSA', 'Error')
+    if label == None:   label = metric.__name__.replace('SSPB', '\\beta').replace('MdSA', '\\varepsilon\\thinspace').replace('Slope','S\\thinspace').replace('R^2','R^2\\thinspace').replace('N', 'N\\thinspace')
     if longest == None: longest = len(label)
 
     ispct = metric.__qualname__ in ['mape', 'sspb', 'mdsa'] # metrics which are percentages
@@ -67,7 +67,7 @@ def _create_metric(metric, y_true, y_est, longest=None, label=None):
 
 def _create_stats(y_true, y_est, metrics, title=None):
     ''' Create stat box strings for all metrics, assuming there is only a single target feature '''
-    longest = max([len(metric.__name__.replace('SSPB', 'Bias').replace('MdSA', 'Error').replace('^','')) for metric in metrics])
+    longest = max([len(metric.__name__.replace('SSPB', 'Bias').replace('MdSA', 'Unc.').replace('^','')) for metric in metrics])
     statbox = [_create_metric(m, y_true, y_est, longest=longest) for m in metrics]
     
     if title is not None:
@@ -80,13 +80,13 @@ def _create_multi_feature_stats(y_true, y_est, metrics, labels=None):
         labels = [f'Feature {i}' for i in range(y_true.shape[1])]
     assert(len(labels) == y_true.shape[1] == y_est.shape[1]), f'Number of labels does not match number of features: {labels} - {y_true.shape}'
     
-    title   = metrics[0].__name__.replace('SSPB', 'Bias').replace('MdSA', 'Error')
+    title   = metrics[0].__name__.replace('SSPB', 'Bias').replace('MdSA', 'Unc.')
     longest = max([len(label.replace('^','')) for label in labels])
     statbox = [_create_metric(metrics[0], y1, y2, longest=longest, label=lbl) for y1, y2, lbl in zip(y_true.T, y_est.T, labels)]
     statbox = [rf'$\mathbf{{\underline{{{title}}}}}$'] + statbox
     return statbox 
 
-def add_stats_box(ax, y_true, y_est, metrics=[mdsa, sspb, slope], bottom_right=False, bottom=False, right=False, x=0.025, y=0.97, fontsize=16, label=None):
+def add_stats_box(ax, y_true, y_est, metrics=[mdsa, sspb, slope], bottom_right=False, bottom=False, right=False, x=0.025, y=0.97, fontsize=16, label=None,fontcolor='black'):
     ''' Add a text box containing a variety of performance statistics, to the given axis '''
     import matplotlib.pyplot as plt
     plt.rc('text', usetex=True)
@@ -110,7 +110,7 @@ def add_stats_box(ax, y_true, y_est, metrics=[mdsa, sspb, slope], bottom_right=F
         }
     }
 
-    ann = ax.annotate(stats_box, xy=(x,y), size=fontsize, **ann_kwargs)
+    ann = ax.annotate(stats_box, xy=(x,y), size=fontsize,color=fontcolor, **ann_kwargs)
 
     bottom |= bottom_right
     right  |= bottom_right
@@ -125,11 +125,11 @@ def add_stats_box(ax, y_true, y_est, metrics=[mdsa, sspb, slope], bottom_right=F
         if bottom:
             new_y = bbox_orig.y1 - bbox_orig.y0 + (1 - y)
             ann.set_y(new_y)
-            new_y += 0.06
+            new_y += 0.01
         if right:
             new_x = 1 - (bbox_orig.x1 - bbox_orig.x0) + x
             ann.set_x(new_x)
-            new_x -= 0.04
+            new_x -= 0.05
         ann.xy = (new_x, new_y)
     return ann 
     
@@ -333,7 +333,7 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
     # Only plot certain bands
     if len(labels) > 3 :
         product_bands = {
-            'default' :  [443,482,561,655] if 'OLI'  in sensor else [443,490,560,620,673,710]  if 'OLCI' in sensor  else [443,530,620,673,]  if args.use_HICO_aph  else  [409,443,478,535,620,673,690,724]  #[415,443,490,501,550,620,673,690] #[443,482,561,655]
+            'default' :  [443,482,561,655] if 'OLI'  in sensor else [443,490,560,620,673,710]  if 'OLCI' in sensor  else [444,530,621,673,]  if args.use_HICO_aph  else  [409,443,478,535,620,673,690,724]  #[415,443,490,501,550,620,673,690] #[443,482,561,655]
             # 'aph'     : [443, 530], [409, 421, 432, 444, 455, 467, 478, 490, 501, 512, 524, 535, 547, 558, 570, 581, 593, 604, 616, 621, 633, 644, 650, 656, 667, 673, 679, 684, 690, 701, 713, 724,]
         }
 
@@ -515,7 +515,7 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
                 est_lbl = 'MDN'
                 # est_lbl = 'MDN-I'
             else:
-                est_lbl = est_lbl.replace('Mishra_','').replace('Gons_2band', 'Gons').replace('Gilerson_2band', 'GI2B').replace('Smith_','').replace('Cao_XGB','BST')#.replace('Cao_', 'Cao\ ')
+                est_lbl = est_lbl.replace('Mishra_','').replace('Gons_2band', 'Gons').replace('Gilerson_2band', 'GI2B').replace('Smith_','').replace('Cao_XGB','BST') #.replace('Schalles', 'Schalles and Yacobi (2000)').replace('Sim2005', 'Simis et al. 2005')#.replace('Cao_', 'Cao\ ')
 
             if product not in ['chl', 'tss', 'cdom','pc','nap','SCDOM','SNAP'] and last_col:
                 ax2 = ax.twinx()
@@ -595,6 +595,7 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
                 elif est_lbl == 'Ficek':
                     # ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$'+'\n'+r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$', fontsize=18)
                     ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$' + r'$\small{\textit{\ (et\ al.\ 2011)}}$', fontsize=18, linespacing=0.95)
+
                                 
                 elif est_lbl == 'Mannino':
                     # ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$'+'\n'+r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$', fontsize=18)
@@ -603,7 +604,27 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
                 elif est_lbl == 'Novoa':
                     # ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$'+'\n'+r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$', fontsize=18)
                     ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$' + r'$\small{\textit{\ (et\ al.\ 2017)}}$', fontsize=18, linespacing=0.95)
-
+                elif est_lbl == 'Sim2005':
+                    # ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$'+'\n'+r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$', fontsize=18)
+                    est_lb='Simis'
+                    ax.set_title(fr'$\mathbf{{\large{{{est_lb}}}}}$' + r'$\small{\textit{\ (et\ al.\ 2005)}}$', fontsize=18, linespacing=0.95)
+                    
+                elif est_lbl == 'GI2B':
+                    # ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$'+'\n'+r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$', fontsize=18)
+                    est_lb='Gilerson'
+                    ax.set_title(fr'$\mathbf{{\large{{{est_lb}}}}}$' + r'$\small{\textit{\ (et\ al.\ 2010)}}$', fontsize=18, linespacing=0.95)
+                elif est_lbl == 'Blend':
+                    # ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$'+'\n'+r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$', fontsize=18)
+                    est_lb='Smith'
+                    ax.set_title(fr'$\mathbf{{\large{{{est_lb}}}}}$' + r'$\small{\textit{\ (et\ al.\ 2018)}}$', fontsize=18, linespacing=0.95)
+                elif est_lbl == 'Nechad':
+                    # ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$'+'\n'+r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$', fontsize=18)
+                    # est_lb='Smith'
+                    ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$' + r'$\small{\textit{\ (et\ al.\ 2010)}}$', fontsize=18, linespacing=0.95)                    
+                elif est_lbl == 'Schalles':
+                    # ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$'+'\n'+r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$', fontsize=18)
+                    est_lb='Schalles\ and\ Yacobi'
+                    ax.set_title(fr'$\mathbf{{\large{{{est_lb}}}}}$' + r'$\small{\textit{\ (et\ al.\ 2005)}}$', fontsize=18, linespacing=0.95)
                 else: ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$' '\n' f'(N={sum(np.isfinite(y_true))})', fontsize=18) if first_col else  ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$' , fontsize=18)
             # ax.x
             ax.tick_params(labelsize=18)
@@ -1178,7 +1199,7 @@ def plot_remote_insitu(y_remote, y_insitu, dictionary_of_matchups=None, products
 
 
 
-    xlabel = fr'$\mathbf{{Band [nm]}}$'
+    xlabel_base = fr'$\mathbf{{Band [nm]}}$'
     ylabel = fr'$\mathbf{{a\textsubscript{{ph}} [m\textsuperscript{{-1}}]}}$'
     cdom="cdom"
     nap="nap"
@@ -1240,7 +1261,7 @@ def plot_remote_insitu(y_remote, y_insitu, dictionary_of_matchups=None, products
         axes      = [ax for axs in np.atleast_1d(axes) for ax in np.atleast_1d(axs)]
         full_ax  = fig.add_subplot(111, frameon=False)
         full_ax.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False, pad=10)
-        full_ax.set_xlabel(xlabel.replace(' ', '\ '), fontsize=28, labelpad=10)
+        full_ax.set_xlabel(xlabel_base.replace(' ', '\ '), fontsize=28, labelpad=10)
 
         for plotting_label_current in site_labels_of_interest:
             if plotting_label_current in dictionary_of_matchups['plotting_labels']:
@@ -1340,39 +1361,46 @@ def plot_remote_insitu(y_remote, y_insitu, dictionary_of_matchups=None, products
     
             ax2 = axes[plt_idx_2]
             # ax2.plot(ad_wvl_resampled,ad_resampled[index,:], 'k',label=fr'$a\textsubscript{{d}}$')
-            ax2.plot(ag_wvl_resampled,ag_resampled[index,:], 'k',label=fr'$a\textsubscript{{g}}$',linewidth=linewidth_truth)
+            ax2.plot(ag_wvl_resampled,ag_resampled[index,:], 'k',label=fr'$a\textsubscript{{g}}$',linewidth=linewidth_truth,zorder=0)
             
             # ax2.plot(bands_ad_ag,ad_remote_estimate,'r')
-            ax2.plot(bands_ad_ag,ag_insitu_estimate,'c',linewidth=linewidth_insitu)
-            ax2.plot(bands_ad_ag,ag_remote_estimate,'r',linewidth=linewidth_remote)
+            # ax2.plot(bands_ad_ag,ag_insitu_estimate,'c',linewidth=linewidth_insitu)
+            # ax2.scatter(bands_ad_ag,ag_remote_estimate,c='r')
             ag_measurement=dictionary_of_matchups['cdom'][index][0]
-            ax2.plot(443,ag_measurement,'k.',markersize=15,label=fr'$cdom\textsubscript{{443}}$')
-            ax2.plot(443,cdom_remote_estimate,'r.',markersize=15)
-            ax2.plot(443,cdom_insitu_estimate,'c.',markersize=15)
+            ax2.scatter(443,ag_measurement,marker='.',c='k',s=15,label=fr'$cdom\textsubscript{{443}}$',edgecolors='black',zorder=2)
+            ax2.scatter(443,cdom_remote_estimate,marker='.',c='r',s=15,edgecolors='black',zorder=2)
+            ax2.scatter(443,cdom_insitu_estimate,marker='.',c='c',s=15,edgecolors='black',zorder=2)
     
             # ax2.plot(bands_ad_ag,ad_insitu_estimate,'g')
             import math 
             from .utils import convert_point_slope_to_spectral_cdom, convert_spectral_cdom_to_point_slope
-            # wavelengths = [412,443,500,550,600,650,700]
+            wavelengths = [i for i in range(400,700)] #[412,443,500,550,600,650,700]
             # CDOM=1.5
             # SCDOM = 0.0182
-            # spectral_CDOM = convert_point_slope_to_spectral_cdom(CDOM,SCDOM,wavelengths,reference_CDOM_wavelength=440)
-            # plt.plot(wavelengths,spectral_CDOM)
+
             # plt.ylabel('ag | ad')
             # plt.xlabel('Wavelength (nm)')
 
             # plt.show()
             allowed_error=20
             CDOM_truth,SCDOM_truth = convert_spectral_cdom_to_point_slope(ag_wvl_resampled,ag_resampled[index,:],reference_CDOM_wavelength=443,spectral_min_max=[400,700],allowed_error=allowed_error)
-
             CDOM_insitu,SCDOM_insitu = convert_spectral_cdom_to_point_slope(bands_ad_ag,ag_insitu_estimate,reference_CDOM_wavelength=443,spectral_min_max=[400,700],allowed_error=allowed_error)
             CDOM_remote,SCDOM_remote = convert_spectral_cdom_to_point_slope(bands_ad_ag,ag_remote_estimate,reference_CDOM_wavelength=443,spectral_min_max=[400,700],allowed_error=allowed_error)
+            spectral_CDOM_remote = convert_point_slope_to_spectral_cdom(CDOM_remote,SCDOM_remote,wavelengths,reference_CDOM_wavelength=443)
+            ax2.plot(wavelengths,spectral_CDOM_remote,'r',linewidth=linewidth_remote,zorder=0)
+            ax2.scatter(bands_ad_ag,ag_remote_estimate,c='r',edgecolors='black',zorder=1)
+
+            spectral_CDOM_insitu = convert_point_slope_to_spectral_cdom(CDOM_insitu,SCDOM_insitu,wavelengths,reference_CDOM_wavelength=443)
+            ax2.plot(wavelengths,spectral_CDOM_insitu,'c',linewidth=linewidth_remote,zorder=0)
+            ax2.scatter(bands_ad_ag,ag_insitu_estimate,c='c',edgecolors='black',zorder=1)
+
+
             font_cdom=22
             CDOM_truth_rounded=np.round(ag_measurement,1)
             plabel = product_labels['ag443']
             plabel = f'{plabel}'
             xlabel = fr'$\mathbf{{ {plabel} }}$  : (CDOM) : S-CDOM'
-            ax2.text(426,2.26,xlabel,color='k',fontsize=font_cdom-3.5,fontweight='extra bold')
+            ax2.text(426,2.26,xlabel,color='k',fontsize=font_cdom-4.5,fontweight='extra bold')
             ax2.text(472,2.05,f'{CDOM_truth:.2f} : ({CDOM_truth_rounded:.1f}) : {SCDOM_truth:.4f}',color='k',fontsize=font_cdom,fontweight='extra bold')
             ax2.text(472,1.85,f'{CDOM_insitu:.2f} : ({cdom_insitu_estimate:.1f}) : {SCDOM_insitu:.4f}',color='c',fontsize=font_cdom,fontweight='extra bold')
             ax2.text(472,1.65,f'{CDOM_remote:.2f} : ({cdom_remote_estimate:.1f}) : {SCDOM_remote:.4f}',color='r',fontsize=font_cdom,fontweight='extra bold')
@@ -1408,10 +1436,10 @@ def plot_remote_insitu(y_remote, y_insitu, dictionary_of_matchups=None, products
     
     
             ax3 = axes[plt_idx_3]
-            ax3.plot(ad_wvl_resampled,ad_resampled[index,:], 'k',label=fr'$a\textsubscript{{d}}$',linewidth=linewidth_truth)
+            ax3.plot(ad_wvl_resampled,ad_resampled[index,:], 'k',label=fr'$a\textsubscript{{d}}$',linewidth=linewidth_truth,zorder=0)
             # ax3.plot(ag_wvl_resampled,ag_resampled[index,:], 'k-.',label=fr'$a\textsubscript{{g}}$')
-            ax3.plot(bands_ad_ag,ad_insitu_estimate,'c',linewidth=linewidth_insitu)
-            ax3.plot(bands_ad_ag,ad_remote_estimate,'r',linewidth=linewidth_remote)
+            # ax3.plot(bands_ad_ag,ad_insitu_estimate,'c',linewidth=linewidth_insitu)
+            # ax3.plot(bands_ad_ag,ad_remote_estimate,'r',linewidth=linewidth_remote)
             # ax3.plot(bands_ad_ag,ag_remote_estimate,'r-.')
             ag_measurement=dictionary_of_matchups['cdom'][index][0]
             # ax3.plot(443,ag_measurement,'k.',markersize=12,label=fr'$cdom\textsubscript{{443}}$')
@@ -1423,6 +1451,16 @@ def plot_remote_insitu(y_remote, y_insitu, dictionary_of_matchups=None, products
             NAP_truth,SNAP_truth = convert_spectral_cdom_to_point_slope(ad_wvl_resampled,ad_resampled[index,:],reference_CDOM_wavelength=443,spectral_min_max=[400,700],allowed_error=allowed_error)
             NAP_insitu,SNAP_insitu = convert_spectral_cdom_to_point_slope(bands_ad_ag,ad_insitu_estimate,reference_CDOM_wavelength=443,spectral_min_max=[400,700],allowed_error=allowed_error)
             NAP_remote,SNAP_remote = convert_spectral_cdom_to_point_slope(bands_ad_ag,ad_remote_estimate,reference_CDOM_wavelength=443,spectral_min_max=[400,700],allowed_error=allowed_error)
+            
+            
+            spectral_NAP_remote = convert_point_slope_to_spectral_cdom(NAP_remote,SNAP_remote,wavelengths,reference_CDOM_wavelength=443)
+            ax3.plot(wavelengths,spectral_NAP_remote,'r',linewidth=linewidth_remote,zorder=0)
+            ax3.scatter(bands_ad_ag,ad_remote_estimate,c='r',edgecolors='black',zorder=1)
+
+            spectral_NAP_insitu = convert_point_slope_to_spectral_cdom(NAP_insitu,SNAP_insitu,wavelengths,reference_CDOM_wavelength=443)
+            ax3.plot(wavelengths,spectral_NAP_insitu,'c',linewidth=linewidth_remote,zorder=0)
+            ax3.scatter(bands_ad_ag,ad_insitu_estimate,c='c',edgecolors='black',zorder=1)
+            
             # font_cdom=18
             plabel = product_labels['ad443']
             plabel = f'{plabel}'
@@ -1468,7 +1506,56 @@ def plot_remote_insitu(y_remote, y_insitu, dictionary_of_matchups=None, products
 
     
     
-    
+def plot_bbp_error(bbp_GIOP_initialized,bbp_GIOP_standard,bbp_truth,found_bbp_wavelengths):
+    import matplotlib.pyplot as plt
+    plt.rc('text', usetex=True)
+    plt.rcParams['mathtext.default']='regular'
+    # fig = plt.figure()
+    fig, axes = plt.subplots(5,4,figsize=(12, 8.5))
+    full_ax  = fig.add_subplot(111, frameon=False)
+    full_ax.yaxis.set_ticklabels([])
+    full_ax.xaxis.set_ticklabels([])
+
+    ylabel = fr'$\mathbf{{remotely estimated b\textsubscript{{bp}} [m\textsuperscript{{-1}}]}}$'
+    xlabel = fr'$\mathbf{{\textit{{in situ}} measured b\textsubscript{{bp}} [m\textsuperscript{{-1}}]}}$'
+    full_ax.set_xlabel(xlabel.replace(' ', '\ '), fontsize=14, labelpad=10)
+    full_ax.set_ylabel(ylabel.replace(' ', '\ '), fontsize=14, labelpad=30)
+    for index,ax in enumerate(axes.reshape(-1)):
+        # index = 2
+        # ax = axes[index]
+        ax.scatter(bbp_truth[:,index], bbp_GIOP_initialized[:,index],c='r' ,s=9,alpha=0.3)
+        ax.scatter(bbp_truth[:,index], bbp_GIOP_standard[:,index],c='k' ,s=4,alpha=0.3)
+        ax.set_title(str(found_bbp_wavelengths[index]) + " nm")
+        #add error metrics and contours 
+        #Calculate total error metrics
+        #ax.set_xlabel('Truth')
+       # ax.set_ylabel('Estimate')
+        ax.set_yscale('log')
+        ax.set_xscale('log')
+        # ax.grid()
+        ax.grid('on', alpha=0.5)
+        ax.set_xlim([1e-3,1e0])
+        ax.set_ylim([1e-3,1e0])
+        add_identity(ax, ls='--', color='k', zorder=20)
+        statbox_fontsize = 7
+        add_stats_box(ax, bbp_truth[:,index],bbp_GIOP_initialized[:,index],metrics=[N,mdsa,sspb,slope],fontsize=statbox_fontsize,fontcolor='red')
+        add_stats_box(ax, bbp_truth[:,index],bbp_GIOP_standard[:,index],metrics=[N,mdsa,sspb, slope],bottom_right=True,fontsize=statbox_fontsize,)
+        if index == 0:
+            add_stats_box(ax, bbp_truth.flatten(),bbp_GIOP_initialized.flatten(),metrics=[N,mdsa,sspb,slope],bottom=True,fontsize=statbox_fontsize,fontcolor='orange')
+            add_stats_box(ax, bbp_truth.flatten(),bbp_GIOP_standard.flatten(),metrics=[N,mdsa,sspb,slope],right=True,fontsize=statbox_fontsize,fontcolor='gray')
+        if index <16:
+            ax.xaxis.set_ticklabels([])
+
+        if index %4 !=0:
+            ax.yaxis.set_ticklabels([])
+        # ylabel = fr'$\mathbf{{b\textsubscript{{bp}} [m\textsuperscript{{-1}}]}}$'
+        # text_label = ylabel.replace(' ', '\ '),
+        # text(0.9,0.905,text_label,horizontalalignment='center',verticalalignment='center',transform=ax.transAxes,backgroundcolor='1.0',bbox=dict(facecolor='white',edgecolor='black',boxstyle='round'))
+
+
+        
+        plt.tight_layout()
+    plt.savefig('bbp_retrieval.png',dpi=600)
     
     
     

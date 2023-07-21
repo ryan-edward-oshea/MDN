@@ -79,9 +79,9 @@ def rmse(y, y_hat):
 
 @only_finite
 @only_positive
-@label('RMSLE')
+@label('RMSLD')
 def rmsle(y, y_hat):
-	''' Root Mean Squared Logarithmic Error '''
+	''' Root Mean Squared Logarithmic Difference '''
 	return np.mean(np.abs(np.log(y) - np.log(y_hat)) ** 2) ** 0.5 
 
 
@@ -113,6 +113,12 @@ def leqz(y, y_hat=None):
 	if y_hat is None: y_hat = y
 	return (y_hat <= 0).sum()
 
+@only_finite
+@label('N')
+def N(y, y_hat=None):
+	''' number of predictions '''
+	if y_hat is None: y_hat = y
+	return (np.isfinite(y_hat)).sum()
 
 @validate_shape
 @label('<=0|NaN')
