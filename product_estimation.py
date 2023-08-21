@@ -9,13 +9,66 @@ import hashlib
 
 from .model import MDN
 from .meta  import get_sensor_bands, SENSOR_LABEL, ANCILLARY, PERIODIC
-from .utils import get_labels, get_data, generate_config, using_feature, split_data, _load_datasets, compress, get_matchups, find_wavelength
+from .utils import get_labels, get_data, generate_config, using_feature, split_data, _load_datasets, compress, get_matchups, find_wavelength, OWT_classification,  convert_point_slope_to_spectral_cdom, convert_spectral_cdom_to_point_slope
 from .metrics import performance, mdsa, sspb, msa
 from .plot_utils import plot_scatter, plot_histogram, plot_spectra, plot_remote_insitu, add_identity
 from .benchmarks import run_benchmarks
 from .parameters import get_args
 from .transformers import TransformerPipeline, generate_scalers
 
+from MDN.meta import get_sensor_bands
+from MDN.benchmarks.multiple.GIOP_initialized.model    import model as GIOP_init
+from MDN.benchmarks.multiple.GIOP.model                import model as GIOP_default
+from MDN.benchmarks.multiple.QAA_initialized.model     import model as QAA_init
+from MDN.benchmarks.multiple.QAA.model                 import model as QAA_default
+from MDN.benchmarks.multiple.Gordon.model              import model as Gordon_init
+
+
+def return_spectral_array(multispectral_variable, args, normalize = True):
+    adg_local = []
+    wavelengths_adg             = get_sensor_bands(args.sensor+'-adag', args)
+    wavelengths                 = get_sensor_bands(args.sensor, args)
+
+    for i in multispectral_variable:
+        adg_remote,Sadg_remote  = convert_spectral_cdom_to_point_slope(wavelengths_adg,i,reference_CDOM_wavelength=443,spectral_min_max=[400,700],allowed_error=100)
+        spectral_adg_remote     = convert_point_slope_to_spectral_cdom(adg_remote,Sadg_remote,wavelengths,reference_CDOM_wavelength=443)
+        if normalize:
+            adg_local.append(spectral_adg_remote/adg_remote)
+        else:
+            adg_local.append(spectral_adg_remote)
+    return np.array(adg_local)
+
+def get_bbp_estimates(Rrs,estimates,slices,args,outputs = ['Gordon']):
+        sensor                        = args.sensor
+        wavelengths                   = get_sensor_bands(args.sensor, args)
+
+        GIOP_initialization           =  {'chl' : estimates[:,slices['chl']],
+                                          'aph' : estimates[:,slices['aph']],
+                                          'ad'  : return_spectral_array(estimates[:,slices['ad']],args,normalize=True)[:,0:50],
+                                          'ag'  : return_spectral_array(estimates[:,slices['ag']],args,normalize=True)[:,0:50]
+                                          }
+
+        QAA_initialization            =  {'chl' : estimates[:,slices['chl']],
+                                          'aph' : estimates[:,slices['aph']],
+                                          'ad'  : return_spectral_array(estimates[:,slices['ad']],args,normalize=False)[:,0:50],
+                                          'ag'  : return_spectral_array(estimates[:,slices['ag']],args,normalize=False)[:,0:50]
+                                          }
+
+        GIOP_initialization['adg']    = (GIOP_initialization['ad'] + GIOP_initialization['ag'])/2
+        bbp_estimates = {}
+        
+        if 'GIOP' in outputs:
+            bbp_estimates['GIOP-MDN']     = GIOP_init(   Rrs[:,0:50], wavelengths[0:50], sensor,**GIOP_initialization)
+            bbp_estimates['GIOP-default'] = GIOP_default(Rrs[:,0:50], wavelengths[0:50], sensor)
+
+        if 'QAA' in outputs:
+            bbp_estimates['QAA-MDN']     = QAA_init(    Rrs[:,0:50], wavelengths[0:50], sensor,**QAA_initialization)
+            bbp_estimates['QAA-default'] = QAA_default( Rrs[:,0:50], wavelengths[0:50], sensor)
+            
+        if 'Gordon' in outputs:
+            bbp_estimates['Gordon-MDN']      = Gordon_init( Rrs[:,0:50], wavelengths[0:50], sensor,**QAA_initialization)
+
+        return bbp_estimates
 
 def get_estimates(args, x_train=None, y_train=None, x_test=None, y_test=None, output_slices=None, dataset_labels=None, x_sim=None, y_sim=None, return_model=False, return_coefs=False):
     ''' 
@@ -107,6 +160,14 @@ def get_estimates(args, x_train=None, y_train=None, x_test=None, y_test=None, ou
 
         if x_test is not None:
             (estimates, *confidence), coefs = model.predict(x_test, **predict_kwargs)
+            #Add on bbp outputs if aph/ad/ag are available
+            if all( [ product in args.product.split(',') for product in  ['aph','ad','ag']]):
+                bbp_estimates = get_bbp_estimates(Rrs=x_test,estimates=estimates,slices=model.output_slices,args=args)
+                bbp_gordon    = bbp_estimates['Gordon-MDN']['bbp']
+                if 'bbp' not in model.output_slices.keys():
+                    model.output_slices['bbp'] = slice(np.shape(estimates)[1],np.shape(estimates)[1]+np.shape(bbp_gordon)[1])
+                estimates     = np.concatenate((estimates, bbp_gordon),axis=1)
+
             outputs['estimates'].append(estimates)
 
             if return_coefs:
@@ -222,7 +283,7 @@ def generate_estimates(args, bands, x_train, y_train, x_test, y_test, slices, lo
     return benchmarks
 
 
-def main(kwargs,plot_matchups=False):
+def main(kwargs,plot_matchups=False,run_bbp=False):
     args = get_args(kwargs,use_cmdline=False)
     if plot_matchups:
         import pickle
@@ -424,197 +485,71 @@ def main(kwargs,plot_matchups=False):
         #saves the plots and config to a folder with the models name
 
     #Test a Bbp model out
-    elif True:
-        import math
-        #Source: https://pysptools.sourceforge.io/_modules/pysptools/distance/dist.html#SAM
-        def SAM(s1, s2):
-            """
-            Computes the spectral angle mapper between two vectors (in radians).
-        
-            Parameters:
-                s1: `numpy array`
-                    The first vector.
-        
-                s2: `numpy array`
-                    The second vector.
-        
-            Returns: `float`
-                    The angle between vectors s1 and s2 in radians.
-            """
-            try:
-                # print(s1,s2)
+    elif run_bbp:
+         
 
-                s1_norm = math.sqrt(np.dot(s1, s1))
-                # print(s1_norm)
-                s2_norm = math.sqrt(np.dot(s2, s2))
-                # print(s2_norm)
-
-                sum_s1_s2 = np.dot(s1, s2)
-                # print(sum_s1_s2)
-
-                angle = math.acos(sum_s1_s2 / (s1_norm * s2_norm))
-                # print(angle)
-
-            except ValueError:
-                # python math don't like when acos is called with
-                # a value very near to 1
-                print("Value Error")
-                return 0.0
-            return angle
         
-        removed_dataset_holder = args.removed_dataset
-        args.removed_dataset=""
-        args.product        ="bbp"
-        x_data, y_data, slices, locs, lat_lon_data = get_data(args)
+        from .plot_utils import plot_bbp_error,plot_bbp_spectra
         
-        from MDN.meta import get_sensor_bands
-        from MDN.benchmarks.multiple.GIOP_initialized.model import model as GIOP_init
-        from MDN.benchmarks.multiple.GIOP.model import model as GIOP_std
-
         import numpy  as np
-
-
-        # load Rrs with bbp vs wavelength
-
-
-        # Generate simultaneous MDN estimates from Rrs
-        sensor = "HICO"
-        Rrs = x_data #.random.random((6, 5)) # example data containing [6 samples, 5 wavelengths] for OLI
-        # wavelengths = [443, 482, 561, 655, 865] #OLI bands (including upper band, 865 nm)
-        wavelengths   = get_sensor_bands(args.sensor, args)
-        wavelengths_adg = get_sensor_bands(args.sensor+'-adag', args)
-        wavelengths_aph = get_sensor_bands(args.sensor+'-aph', args)
-
-        wavelengths_bbp = get_sensor_bands('bbp', args)
-
-        #add ad and ag together, to estimate sdg/adg on a per product basis 
-
-
-        args.removed_dataset=removed_dataset_holder
-        args.product        ="aph,chl,tss,pc,ad,ag,cdom"
-        estimates, slices =  get_estimates(args, x_test = x_data, output_slices=slices, dataset_labels=locs[:,0])
-        estimates         = np.median(estimates, 0)
-        GIOP_initialization =  {'chl' : estimates[:,slices['chl']],
-                                'aph' : estimates[:,slices['aph']],
-                               }
-        #Calculate slope
+        from   pylab import text
+        from   spectral import spectral_angles
+        import matplotlib.pyplot as plt
+        import math, random
+        random.seed(43)
         
-        # run the HICO model on the loaded Bbp Rrs, generate initializations, 
-        from .utils import convert_point_slope_to_spectral_cdom, convert_spectral_cdom_to_point_slope
-        def return_spectral_array(multispectral_variable):
-            adg_local = []
-            for i in multispectral_variable:
-                adg_remote,Sadg_remote  = convert_spectral_cdom_to_point_slope(wavelengths_adg,i,reference_CDOM_wavelength=443,spectral_min_max=[400,700],allowed_error=20)
-                spectral_adg_remote     = convert_point_slope_to_spectral_cdom(adg_remote,Sadg_remote,wavelengths,reference_CDOM_wavelength=443)
-                adg_local.append(spectral_adg_remote/adg_remote)
-            return np.array(adg_local)
+        removed_dataset_holder        = args.removed_dataset
+        args.removed_dataset          = "SeaBASS_bb\\Zimmerman_Richard\\Seagrass_Mapping_Florida\\Fwtic2010\\requested_files\\ODU\\archive"
+        args.product                  = "bbp"
+        
+        x_data, y_data, slices, locs, lat_lon_data = get_data(args)
        
-        GIOP_initialization['ad']  =  return_spectral_array(estimates[:,slices['ad']])[:,0:50]
-        GIOP_initialization['ag']  =  return_spectral_array(estimates[:,slices['ag']])[:,0:50]
-        GIOP_initialization['adg'] =   (GIOP_initialization['ad'] + GIOP_initialization['ag'])/2
-        #GIOP_initialization = {}
+        sensor                        = "HICO"
+        Rrs                           = x_data 
+        wavelengths                   = get_sensor_bands(args.sensor, args)
+        wavelengths_adg               = get_sensor_bands(args.sensor+'-adag', args)
+        wavelengths_aph               = get_sensor_bands(args.sensor+'-aph', args)
+        wavelengths_bbp               = get_sensor_bands('bbp', args)
 
-    
-        GIOP_estimates_initialized = GIOP_init(Rrs[:,0:50], wavelengths[0:50], sensor,**GIOP_initialization)
 
-        # run the HICO model on the standard GIOP algorithm
-        GIOP_estimates_standard    = GIOP_std(Rrs[:,0:50], wavelengths[0:50], sensor)
         
-        resample_wavelength_locations = [] #[find_wavelength(i,wavelengths[0:50],tol=6)  for i in wavelengths_bbp] 
-        found_bbp_wavelengths = []
-        found_bbp_wavelengths_index = []
+        args.removed_dataset          = removed_dataset_holder
+        args.product                  = "aph,chl,tss,pc,ad,ag,cdom"
+        
+        estimates, slices             = get_estimates(args, x_test = x_data, output_slices=slices, dataset_labels=locs[:,0])
+        estimates                     = np.median(estimates, 0)
+        
+        bbp_dictionary                = get_bbp_estimates(Rrs=Rrs,estimates=estimates,slices=slices,args=args,outputs=['Gordon','GIOP','QAA'])
+        
+        resample_wavelength_locations = [] 
+        found_bbp_wavelengths         = []
+        found_bbp_wavelengths_index   = []
+        
         for i,bbp_wavelength in enumerate(wavelengths_bbp):
             try:
                 resample_wavelength_locations.append(find_wavelength(bbp_wavelength,wavelengths[0:50],tol=5))
                 found_bbp_wavelengths.append(bbp_wavelength)
                 found_bbp_wavelengths_index.append(i)
             except:
-                #resample_wavelength_locations.append(np.nan)
                 print(bbp_wavelength, "not found")
-                
         
-        #Identify the available bands and pull the bbp data to match 
-        bbp_GIOP_initialized = np.array([GIOP_estimates_initialized['bbp'][:,bbp_wavelength] for bbp_wavelength in resample_wavelength_locations]).T
-        bbp_GIOP_standard    = np.array([GIOP_estimates_standard ['bbp'][:,bbp_wavelength]   for bbp_wavelength in resample_wavelength_locations]).T
-        bbp_truth            = y_data[:,found_bbp_wavelengths_index]
-        
-        import random
-        from pylab import text
-        from spectral import spectral_angles
-        import matplotlib.pyplot as plt
-        from .plot_utils import plot_bbp_error
-        plot_bbp_error(bbp_GIOP_initialized,bbp_GIOP_standard,bbp_truth,found_bbp_wavelengths)
-        
-        fig, axes = plt.subplots(5,4,figsize=(12, 8.5))
-        full_ax  = fig.add_subplot(111, frameon=False)
-        full_ax.yaxis.set_ticklabels([])
-        full_ax.xaxis.set_ticklabels([])
-
-        ylabel = fr'$\mathbf{{b\textsubscript{{bp}} [m\textsuperscript{{-1}}]}}$'
-        xlabel = fr'$\mathbf{{Wavelength [nm]}}$'
-        full_ax.set_xlabel(xlabel.replace(' ', '\ '), fontsize=14, labelpad=10)
-        full_ax.set_ylabel(ylabel.replace(' ', '\ '), fontsize=14, labelpad=30)
-        
-        # fig, axes = plt.subplots(5,4,figsize=(12, 8.5))
-        random.seed(43)
-
-        for index,ax in enumerate(axes.reshape(-1)):
-            i=random.randint(0,522)
-
-            ax.plot(wavelengths_aph,GIOP_estimates_initialized['bbp'][i,:],c='r',linewidth=5)
-            ax.plot(wavelengths_aph,GIOP_estimates_standard['bbp'][i,:],c='k',linewidth=2.5)
-            ax.scatter(found_bbp_wavelengths,bbp_truth[i,:],c='c',zorder=100)
-            ax.set_yscale('log')
-            # ax.set_xscale('log')
-            # ax.grid()
-            ax.grid('on', alpha=0.5)
-            # ax.set_xlim([1e-3,1e0])
-            ax.set_ylim([1e-3,1e0])
-            ax.set_title(locs[i,0].split('\\')[0].replace('_',' '))
-            truth = bbp_truth[i,:]
-            estimate_init = bbp_GIOP_initialized[i,:]  
-            estimate_std  = bbp_GIOP_standard[i,:]          
-
-            valid = np.logical_not(np.isnan(truth))
-            estimate_init = np.squeeze(estimate_init[valid])
-            estimate_std  = np.squeeze(estimate_std[valid])
-
-            truth =  np.squeeze(truth[valid])
-            SAM_initialized = SAM(estimate_init,truth)
-            SAM_standard    = SAM(estimate_std,truth)
-            text(0.1,0.9,np.round(SAM_initialized,2),horizontalalignment='left',verticalalignment='center',transform=ax.transAxes,backgroundcolor='1.0',bbox=dict(facecolor='white',edgecolor='black',boxstyle='round'),fontdict={'color':'r'})
-            text(0.8,0.9,np.round(SAM_standard,2),horizontalalignment='left',verticalalignment='center',transform=ax.transAxes,backgroundcolor='1.0',bbox=dict(facecolor='white',edgecolor='black',boxstyle='round'),fontdict={'color':'k'})
-            #print(SAM_initialized,SAM_standard)
-            if index <16:
-                ax.xaxis.set_ticklabels([])
-
-            if index %4 !=0:
-                ax.yaxis.set_ticklabels([])
-
-        plt.savefig('spectral_bbp.png',dpi=600)
-
-
-            # #compares only non nan spectra
-            # def spectral_angle(estimate,truth,index):
-            #     valid = not np.isnan(truth)
-            #     estimate = estimate.reshape(estimate.shape[0],1,-1)
-            #     spectral_angles(estimate[valid],truth[valid])
-            # i=22
-            # out=[]
-            # for i in range(522):
-
-            # out = spectral_angles(estimate,truth)
+        def get_OWT_classification(Rrs,wavelengths,k=3,shuffle=True):
+            classes              = OWT_classification(Rrs,wavelengths,sensor= sensor)
+            classes_dict         = {OWT:  [index for index,OWT_bool in enumerate(classes==OWT) if OWT_bool]  for OWT in range(1,8)}
+            if shuffle:  
+                for i in range(1,8): random.shuffle(classes_dict[i])
             
-            # spectral_angle(bbp_GIOP_initialized[i,:],bbp_truth[i,:])
-            # spectral_angles_available = spectral_angles(bbp_GIOP_initialized.reshape(bbp_GIOP_initialized.shape[0],1,-1),bbp_truth[:,:])
-            # # print(spectral_angles_available)
-            # minimum_spectral_angle = np.argmin(spectral_angles_available)
+            return classes, classes_dict
+        
+        classes, classes_dict = get_OWT_classification(Rrs,wavelengths,k=3)
 
-        plt.tight_layout()
-        
-        
+
+        # plot_bbp_error(bbp_Gordon,bbp_default_QAA,bbp_default_GIOP,bbp_truth,found_bbp_wavelengths,label='Gordon')
+        plot_bbp_error(bbp_dictionary,resample_wavelength_locations,found_bbp_wavelengths,found_bbp_wavelengths_index,bbp_truth=y_data,classes=classes,locs=locs,label='Gordon')
+        plot_bbp_spectra(wavelengths_aph,found_bbp_wavelengths,found_bbp_wavelengths_index,resample_wavelength_locations,bbp_dictionary,bbp_truth=y_data,classes_dict=classes_dict)
+                
         assert(0)
-        
+            
         
         
     # Otherwise, train a model with all data (if not already existing)

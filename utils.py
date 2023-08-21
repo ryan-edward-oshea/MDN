@@ -997,7 +997,7 @@ def convert_point_slope_to_spectral_cdom(CDOM,SCDOM,desired_wavelengths,referenc
 
 
 #Takes in available points and wavelengths and calculates point aand slope at 440 nm
-def convert_spectral_cdom_to_point_slope(wavelengths,spectral_CDOM,reference_CDOM_wavelength=443,spectral_min_max=[430,640],allowed_error = 10):
+def convert_spectral_cdom_to_point_slope(wavelengths,spectral_CDOM,reference_CDOM_wavelength=443,spectral_min_max=[430,640],allowed_error = 100):
     #Find all wavelengths in the spectral min/max region
     wavelengths = list(wavelengths)
     spectral_CDOM = list(spectral_CDOM)
@@ -1015,4 +1015,20 @@ def convert_spectral_cdom_to_point_slope(wavelengths,spectral_CDOM,reference_CDO
     #identifies the nearest wavelength, interpolating if necesary
 
 
-
+def OWT_classification(Rrs_input,wavelengths_input,sensor='HICO'):
+    from spectral import spectral_angles
+    if len(np.shape(Rrs_input))==2:
+        Rrs_input = np.expand_dims(Rrs_input,-2)
+    Rrs_array_of_end_members       = pd.read_csv(f'/media/ryanoshea/BackUp/OWT_end_members/OWTs/{sensor}/Rrs.csv', header= None)
+    Rrs_array_of_end_members_wvls  = np.loadtxt(f'/media/ryanoshea/BackUp/OWT_end_members/OWTs/{sensor}/Rrs_wvl.csv', delimiter=',')[:,None]
+ 
+    #only pulls the wavelengths available to input
+    
+    Rrs_array_of_end_members       = Rrs_array_of_end_members.to_numpy()
+    #Rrs_array_of_end_members_wvls  = Rrs_array_of_end_members_wvls.to_numpy()
+    Rrs_array_of_end_members       = Rrs_array_of_end_members[:,find_wavelength(wavelengths_input,np.squeeze(Rrs_array_of_end_members_wvls))]
+    
+    spectral_angles_available      = spectral_angles(Rrs_input,Rrs_array_of_end_members)
+    minimum_spectral_angle         = np.argmin(spectral_angles_available,2) # highest similarity
+    minimum_spectral_angle         = minimum_spectral_angle +1  #add 1 to the OWTs due to 0 indexing in python
+    return minimum_spectral_angle

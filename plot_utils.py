@@ -1,4 +1,4 @@
-from .metrics import slope, sspb, mdsa, rmsle, r_squared, N
+from .metrics import slope, sspb, mdsa, rmsle, r_squared, N, mape,rmse
 from .meta import get_sensor_label,get_sensor_bands
 from .utils import closest_wavelength, ignore_warnings
 from collections import defaultdict as dd 
@@ -86,7 +86,7 @@ def _create_multi_feature_stats(y_true, y_est, metrics, labels=None):
     statbox = [rf'$\mathbf{{\underline{{{title}}}}}$'] + statbox
     return statbox 
 
-def add_stats_box(ax, y_true, y_est, metrics=[mdsa, sspb, slope], bottom_right=False, bottom=False, right=False, x=0.025, y=0.97, fontsize=16, label=None,fontcolor='black'):
+def add_stats_box(ax, y_true, y_est, metrics=[mdsa, sspb, slope], bottom_right=False, bottom=False, right=False, center=False, x=0.025, y=0.97, fontsize=16, label=None,fontcolor='black'):
     ''' Add a text box containing a variety of performance statistics, to the given axis '''
     import matplotlib.pyplot as plt
     plt.rc('text', usetex=True)
@@ -116,20 +116,25 @@ def add_stats_box(ax, y_true, y_est, metrics=[mdsa, sspb, slope], bottom_right=F
     right  |= bottom_right
 
     # Switch location to (approximately) the bottom right corner
-    if bottom or right or bottom_right:
+    if bottom or right or bottom_right or center:
         plt.gcf().canvas.draw()
         bbox_orig = ann.get_tightbbox(plt.gcf().canvas.renderer).transformed(ax.transAxes.inverted())
 
         new_x = bbox_orig.x0
         new_y = bbox_orig.y1
+        new_y += -0.01
         if bottom:
             new_y = bbox_orig.y1 - bbox_orig.y0 + (1 - y)
             ann.set_y(new_y)
-            new_y += 0.01
+            new_y += 0.02
         if right:
             new_x = 1 - (bbox_orig.x1 - bbox_orig.x0) + x
             ann.set_x(new_x)
             new_x -= 0.05
+        if center:
+            new_x = 1 - (bbox_orig.x1 - bbox_orig.x0) + x
+            ann.set_x(new_x)
+            new_x -= 0.4
         ann.xy = (new_x, new_y)
     return ann 
     
@@ -1506,59 +1511,230 @@ def plot_remote_insitu(y_remote, y_insitu, dictionary_of_matchups=None, products
 
     
     
-def plot_bbp_error(bbp_GIOP_initialized,bbp_GIOP_standard,bbp_truth,found_bbp_wavelengths):
+def plot_bbp_error(bbp_dictionary,resample_wavelength_locations,found_bbp_wavelengths,found_bbp_wavelengths_index,bbp_truth,classes,locs,label=''):
+    
+    Gordon_estimates           = bbp_dictionary['Gordon-MDN']
+
+    GIOP_initialized_estimates = bbp_dictionary['GIOP-MDN']
+    GIOP_default_estimates     = bbp_dictionary['GIOP-default']
+
+    QAA_initialized_estimates  = bbp_dictionary['QAA-MDN']
+    QAA_default_estimates      = bbp_dictionary['QAA-default']
+
+    bbp_Gordon                 = np.array([Gordon_estimates['bbp'][:,bbp_wavelength] for bbp_wavelength in resample_wavelength_locations]).T
+
+    bbp_initialized_GIOP       = np.array([GIOP_initialized_estimates['bbp'][:,bbp_wavelength] for bbp_wavelength in resample_wavelength_locations]).T
+    bbp_default_GIOP           = np.array([GIOP_default_estimates['bbp'][:,bbp_wavelength] for bbp_wavelength in resample_wavelength_locations]).T
+
+    bbp_initialized_QAA        = np.array([QAA_initialized_estimates['bbp'][:,bbp_wavelength] for bbp_wavelength in resample_wavelength_locations]).T
+    bbp_default_QAA            = np.array([QAA_default_estimates['bbp'][:,bbp_wavelength] for bbp_wavelength in resample_wavelength_locations]).T
+
+    bbp_truth                  = bbp_truth[:,found_bbp_wavelengths_index]
+    
+    bbp_dict = {'Gordon-MDN'     : bbp_Gordon,
+                  'GIOP-MDN'     : bbp_initialized_GIOP, 
+                  'GIOP-default' : bbp_default_GIOP, 
+                  'QAA-MDN'      : bbp_initialized_QAA, 
+                  'QAA-default'  : bbp_default_QAA, 
+                 }
+    
+    bbp_colors_dict = { 'Gordon-MDN'     : 'r',
+                        'GIOP-MDN'     : 'xkcd:bright blue', 
+                        'GIOP-default' : 'xkcd:vivid purple', 
+                        'QAA-MDN'      : 'xkcd:cement', 
+                        'QAA-default'  : 'k', 
+                        }
+    colors_dict  = { 1 : 'xkcd:barney',
+                     2 : 'xkcd:royal blue', 
+                     3 : 'xkcd:topaz',  
+                     4 : 'xkcd:fresh green',
+                     5 : 'xkcd:goldenrod', 
+                     6 : 'xkcd:bright orange',  
+                     7 : 'xkcd:dark red', }
+    
+    markers_list = ['.','o','v','s','p','P','*','X','d','h']
+    unique_locs  = np.unique(locs[:,0])
+    marker_dict  = {loc: markers_list[i] for i,loc in enumerate(unique_locs)}
+    loc_markers_list = [marker_dict[loc] for loc in locs[:,0]]
+    colors = [colors_dict[OWT[0]] for OWT in list(classes)]
+    for key in marker_dict.keys():
+        print(key, ': ', marker_dict[key])
+    
     import matplotlib.pyplot as plt
     plt.rc('text', usetex=True)
     plt.rcParams['mathtext.default']='regular'
-    # fig = plt.figure()
-    fig, axes = plt.subplots(5,4,figsize=(12, 8.5))
-    full_ax  = fig.add_subplot(111, frameon=False)
-    full_ax.yaxis.set_ticklabels([])
-    full_ax.xaxis.set_ticklabels([])
 
-    ylabel = fr'$\mathbf{{remotely estimated b\textsubscript{{bp}} [m\textsuperscript{{-1}}]}}$'
-    xlabel = fr'$\mathbf{{\textit{{in situ}} measured b\textsubscript{{bp}} [m\textsuperscript{{-1}}]}}$'
-    full_ax.set_xlabel(xlabel.replace(' ', '\ '), fontsize=14, labelpad=10)
-    full_ax.set_ylabel(ylabel.replace(' ', '\ '), fontsize=14, labelpad=30)
-    for index,ax in enumerate(axes.reshape(-1)):
-        # index = 2
-        # ax = axes[index]
-        ax.scatter(bbp_truth[:,index], bbp_GIOP_initialized[:,index],c='r' ,s=9,alpha=0.3)
-        ax.scatter(bbp_truth[:,index], bbp_GIOP_standard[:,index],c='k' ,s=4,alpha=0.3)
-        ax.set_title(str(found_bbp_wavelengths[index]) + " nm")
-        #add error metrics and contours 
-        #Calculate total error metrics
-        #ax.set_xlabel('Truth')
-       # ax.set_ylabel('Estimate')
-        ax.set_yscale('log')
-        ax.set_xscale('log')
-        # ax.grid()
-        ax.grid('on', alpha=0.5)
-        ax.set_xlim([1e-3,1e0])
-        ax.set_ylim([1e-3,1e0])
-        add_identity(ax, ls='--', color='k', zorder=20)
-        statbox_fontsize = 7
-        add_stats_box(ax, bbp_truth[:,index],bbp_GIOP_initialized[:,index],metrics=[N,mdsa,sspb,slope],fontsize=statbox_fontsize,fontcolor='red')
-        add_stats_box(ax, bbp_truth[:,index],bbp_GIOP_standard[:,index],metrics=[N,mdsa,sspb, slope],bottom_right=True,fontsize=statbox_fontsize,)
-        if index == 0:
-            add_stats_box(ax, bbp_truth.flatten(),bbp_GIOP_initialized.flatten(),metrics=[N,mdsa,sspb,slope],bottom=True,fontsize=statbox_fontsize,fontcolor='orange')
-            add_stats_box(ax, bbp_truth.flatten(),bbp_GIOP_standard.flatten(),metrics=[N,mdsa,sspb,slope],right=True,fontsize=statbox_fontsize,fontcolor='gray')
-        if index <16:
-            ax.xaxis.set_ticklabels([])
-
-        if index %4 !=0:
-            ax.yaxis.set_ticklabels([])
-        # ylabel = fr'$\mathbf{{b\textsubscript{{bp}} [m\textsuperscript{{-1}}]}}$'
-        # text_label = ylabel.replace(' ', '\ '),
-        # text(0.9,0.905,text_label,horizontalalignment='center',verticalalignment='center',transform=ax.transAxes,backgroundcolor='1.0',bbox=dict(facecolor='white',edgecolor='black',boxstyle='round'))
-
-
+    for key in bbp_dict.keys():
+        bbp_current = bbp_dict[key]
+        fig, axes = plt.subplots(5,4,figsize=(12, 8.5))
+        full_ax  = fig.add_subplot(111, frameon=False)
+        full_ax.yaxis.set_ticklabels([])
+        full_ax.xaxis.set_ticklabels([])
         
+        ylabel = fr'$\mathbf{{remotely estimated b\textsubscript{{bp}} [m\textsuperscript{{-1}}]}}$'
+        xlabel = fr'$\mathbf{{\textit{{in situ}} measured b\textsubscript{{bp}} [m\textsuperscript{{-1}}]}}$'
+        full_ax.set_xlabel(xlabel.replace(' ', '\ '), fontsize=14, labelpad=10)
+        full_ax.set_ylabel(ylabel.replace(' ', '\ '), fontsize=14, labelpad=30)
+        full_ax.set_title(f'{key}',y=1.035,fontweight='bold')
+        for index,ax in enumerate(axes.reshape(-1)):
+            for x, y, m, c in zip(bbp_truth[:,index], bbp_current[:,index],loc_markers_list,colors):
+                ax.scatter(x, y ,c=c ,s=8,alpha=0.5,marker=m)
+
+            # ax.scatter(bbp_truth[:,index], bbp_current[:,index],c=colors ,s=8,alpha=0.5,marker=loc_markers_list)
+
+            ax.set_title(str(found_bbp_wavelengths[index]) + " nm")
+
+            ax.set_yscale('log')
+            ax.set_xscale('log')
+            ax.grid('on', alpha=0.5)
+            ax.set_xlim([1e-3,1e0])
+            ax.set_ylim([1e-3,1e0])
+            add_identity(ax, ls='--', color='k', zorder=20)
+            statbox_fontsize = 7
+            add_stats_box(ax, bbp_truth[:,index],bbp_current[:,index],metrics=[N,mdsa,sspb,slope,mape,rmse],fontsize=statbox_fontsize,fontcolor='k')
+
+            if index == 0:
+                add_stats_box(ax, bbp_truth.flatten(),bbp_current.flatten(),metrics=[N,mdsa,sspb,slope,mape,rmse],bottom_right=True,fontsize=statbox_fontsize,fontcolor='k')
+                text(0.265,  0.9,'OWT:' ,horizontalalignment='left',verticalalignment='center',transform=ax.transAxes,backgroundcolor='1.0',bbox=dict(facecolor='white',edgecolor='none',boxstyle='round',alpha=0.5),fontdict={'color':'k','fontweight':'bold'})
+
+                for l,OWT_key in enumerate(colors_dict.keys()):
+                    text(0.45+0.06*l,  0.9,f'{OWT_key}' ,horizontalalignment='left',verticalalignment='center',transform=ax.transAxes,backgroundcolor='1.0',bbox=dict(facecolor='white',edgecolor='none',boxstyle='round',alpha=0.5),fontdict={'color':colors_dict[OWT_key],'fontweight':'bold'})
+
+            if index <16:
+                ax.xaxis.set_ticklabels([])
+    
+            if index %4 !=0:
+                ax.yaxis.set_ticklabels([])
+
+            plt.tight_layout()
+        plt.savefig(f'{key}_bbp_retrieval.png',dpi=600)
+    
+#Source: https://pysptools.sourceforge.io/_modules/pysptools/distance/dist.html#SAM
+def SAM(s1, s2):
+    """
+    Computes the spectral angle mapper between two vectors (in radians).
+
+    Parameters:
+        s1: `numpy array`
+            The first vector.
+
+        s2: `numpy array`
+            The second vector.
+
+    Returns: `float`
+            The angle between vectors s1 and s2 in radians.
+    """
+    import math
+    try:
+        s1_norm = math.sqrt(np.dot(s1, s1))
+        s2_norm = math.sqrt(np.dot(s2, s2))
+        sum_s1_s2 = np.dot(s1, s2)
+        angle = math.acos(sum_s1_s2 / (s1_norm * s2_norm))
+
+    except ValueError:
+        print("Value Error")
+        return 0.0
+    return angle    
+
+def plot_bbp_spectra(wavelengths_aph,found_bbp_wavelengths,found_bbp_wavelengths_index,resample_wavelength_locations,bbp_dictionary,bbp_truth,classes_dict):  
+    import matplotlib.pyplot as plt
+    import matplotlib.ticker as mticker
+
+    Gordon_estimates           = bbp_dictionary['Gordon-MDN']
+
+    GIOP_initialized_estimates = bbp_dictionary['GIOP-MDN']
+    GIOP_default_estimates     = bbp_dictionary['GIOP-default']
+
+    QAA_initialized_estimates  = bbp_dictionary['QAA-MDN']
+    QAA_default_estimates      = bbp_dictionary['QAA-default']
+
+    bbp_Gordon                 = np.array([Gordon_estimates['bbp'][:,bbp_wavelength] for bbp_wavelength in resample_wavelength_locations]).T
+
+    bbp_initialized_GIOP       = np.array([GIOP_initialized_estimates['bbp'][:,bbp_wavelength] for bbp_wavelength in resample_wavelength_locations]).T
+    bbp_default_GIOP           = np.array([GIOP_default_estimates['bbp'][:,bbp_wavelength] for bbp_wavelength in resample_wavelength_locations]).T
+
+    bbp_initialized_QAA        = np.array([QAA_initialized_estimates['bbp'][:,bbp_wavelength] for bbp_wavelength in resample_wavelength_locations]).T
+    bbp_default_QAA            = np.array([QAA_default_estimates['bbp'][:,bbp_wavelength] for bbp_wavelength in resample_wavelength_locations]).T
+
+    bbp_truth                  = bbp_truth[:,found_bbp_wavelengths_index]
+    
+    for j in range(0,25):
+        fig, axes                     = plt.subplots(7,3,figsize=(12,12))
+        full_ax                       = fig.add_subplot(111, frameon=False)
+        full_ax.yaxis.set_ticklabels([])
+        full_ax.xaxis.set_ticklabels([])
+
+        ylabel = fr'$\mathbf{{b\textsubscript{{bp}} [m\textsuperscript{{-1}}]}}$'
+        xlabel = fr'$\mathbf{{Wavelength [nm]}}$'
+        full_ax.set_xlabel(xlabel.replace(' ', '\ '), fontsize=14, labelpad=10)
+        full_ax.set_ylabel(ylabel.replace(' ', '\ '), fontsize=14, labelpad=30)
+
+        n_columns = axes.shape[1]
+        n_rows    = axes.shape[0]
+        figure_offset = j*n_columns
+
+        for index,ax in enumerate(axes.reshape(-1)):
+            # i=random.randint(0,522)
+            OWT    = 1 + int((index)/n_columns)
+            offset = index % n_columns
+            if len(classes_dict[OWT])>offset+figure_offset:
+                i      = classes_dict[OWT][offset+figure_offset]
+            else:
+                continue
+
+
+            ax2 = ax.twinx()
+            if (index+1)%3 ==0 : 
+                ax2.set_ylabel(f'OWT: {int((index+1)/3)}',color='g', rotation='horizontal')
+                ax2.yaxis.set_label_coords(1.15,0.52)
+
+            ax2.yaxis.set_ticklabels([])
+
+            
+            ax.plot(wavelengths_aph,     QAA_default_estimates['bbp'][i,:],c='k',                linewidth=4,   zorder=90)
+            ax.plot(wavelengths_aph, QAA_initialized_estimates['bbp'][i,:],c='xkcd:cement',      linewidth=3.75,zorder=93,linestyle = 'dashed')
+            ax.plot(wavelengths_aph,    GIOP_default_estimates['bbp'][i,:],c='xkcd:bright blue' ,linewidth=3.25,zorder=91)
+            ax.plot(wavelengths_aph,GIOP_initialized_estimates['bbp'][i,:],c='xkcd:vivid purple',linewidth=2.9, zorder=94,linestyle = 'dashed')
+            ax.plot(wavelengths_aph,          Gordon_estimates['bbp'][i,:],c='r',                linewidth=2.5, zorder=99)
+            ax.scatter(found_bbp_wavelengths,               bbp_truth[i,:],c='c',                              zorder=100,edgecolors='black')
+
+            ax.grid('on', alpha=0.5)
+
+            truth = bbp_truth[i,:]
+            valid = np.logical_not(np.isnan(truth))
+            truth =  np.squeeze(truth[valid])              
+            
+            SAM_Gordon          = SAM(np.squeeze(          bbp_Gordon[i,:][valid]),truth)
+            SAM_default_GIOP    = SAM(np.squeeze(    bbp_default_GIOP[i,:][valid]),truth)
+            SAM_default_QAA     = SAM(np.squeeze(     bbp_default_QAA[i,:][valid]),truth)
+
+            alpha_value = 0.75
+            text(0.075,0.9,np.round(SAM_Gordon,2),  horizontalalignment='left',verticalalignment='center',transform=ax.transAxes,backgroundcolor='1.0',bbox=dict(facecolor='white',edgecolor='black',boxstyle='round',alpha=alpha_value),fontdict={'color':'r'})
+            text(0.315,0.9,np.round(SAM_default_GIOP,2),horizontalalignment='left',verticalalignment='center',transform=ax.transAxes,backgroundcolor='1.0',bbox=dict(facecolor='white',edgecolor='black',boxstyle='round',alpha=alpha_value),fontdict={'color':'xkcd:bright blue'})
+            text(0.565,0.9,np.round(SAM_default_QAA,2)     ,horizontalalignment='left',verticalalignment='center',transform=ax.transAxes,backgroundcolor='1.0',bbox=dict(facecolor='white',edgecolor='black',boxstyle='round',alpha=alpha_value),fontdict={'color':'k'})
+
+            
+            if index == 0: 
+                text(0.05,  0.1,'Gordon' ,horizontalalignment='left',verticalalignment='center',transform=ax.transAxes,backgroundcolor='1.0',bbox=dict(facecolor='white',edgecolor='black',boxstyle='round',alpha=alpha_value),fontdict={'color':'r','fontweight':'bold'})
+                text(0.3,   0.1,'GIOP'   ,horizontalalignment='left',verticalalignment='center',transform=ax.transAxes,backgroundcolor='1.0',bbox=dict(facecolor='white',edgecolor='black',boxstyle='round',alpha=alpha_value),fontdict={'color':'xkcd:bright blue','fontweight':'bold'})
+                text(0.55,  0.1,'QAA'    ,horizontalalignment='left',verticalalignment='center',transform=ax.transAxes,backgroundcolor='1.0',bbox=dict(facecolor='white',edgecolor='black',boxstyle='round',alpha=alpha_value),fontdict={'color':'k','fontweight':'bold'})
+                text(0.75,  0.1,'in situ',horizontalalignment='left',verticalalignment='center',transform=ax.transAxes,backgroundcolor='1.0',bbox=dict(facecolor='white',edgecolor='black',boxstyle='round',alpha=alpha_value),fontdict={'color':'c','fontweight':'bold'})
+
+            if index <18:
+                ax.xaxis.set_ticklabels([])
+            formatter = mticker.ScalarFormatter(useMathText=True,useOffset=False)
+            formatter.set_powerlimits((0,0))
+            formatter.format = "%1.1f"
+            ax.yaxis.set_major_formatter(formatter)
+
+            # if index %3 !=0:
+                # ax.yaxis.set_ticklabels([])
+
+        plt.savefig(f'/home/ryanoshea/in_situ_database/Working_in_situ_dataset/bbp/Gordon_spectral_bbp_{j}.png',dpi=600)
+
+
         plt.tight_layout()
-    plt.savefig('bbp_retrieval.png',dpi=600)
-    
-    
-    
+        plt.close('all')
     
     
     
