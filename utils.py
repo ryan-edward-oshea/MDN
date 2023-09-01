@@ -409,15 +409,19 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_boo
                 if 'HICO' in args.sensor:   required_wvl =  get_sensor_bands('HICO-aph', args)#[409, 421, 432, 444, 455, 467, 478, 490, 501, 512, 524, 535, 547, 558, 570, 581, 593, 604, 616, 621, 633, 644, 650, 656, 667, 673, 679, 684, 690, 701, 713, 724,],
                 if 'PRISMA' in args.sensor: required_wvl =  get_sensor_bands('PRISMA-aph', args)#[409, 421, 432, 444, 455, 467, 478, 490, 501, 512, 524, 535, 547, 558, 570, 581, 593, 604, 616, 621, 633, 644, 650, 656, 667, 673, 679, 684, 690, 701, 713, 724,],
 
-        if 'ag' in name or 'ad' in name:
+        if 'ag' in name or 'ad' in name or 'bbp_Gordon' in name:
              if args.use_HICO_aph: 
                  if 'HICO' in args.sensor:    required_wvl = get_sensor_bands('HICO-adag', args) #[443, 490, 547, 593, 644,]
                  if 'PRISMA' in args.sensor:  required_wvl = get_sensor_bands('PRISMA-adag', args) #[443, 490, 547, 593, 644,]
-        if 'bbp' in name :
+        if '../MULT/bbp' == name :
              #if args.use_HICO_aph: 
             if 'HICO' in args.sensor:    required_wvl = get_sensor_bands('bbp', args) #[443, 490, 547, 593, 644,]
             if 'PRISMA' in args.sensor:  required_wvl = get_sensor_bands('bbp', args) #[443, 490, 547, 593, 644,]
             loc = loc.parent.joinpath('MULT/')
+            
+        if 'anw' == name:
+            # required_wvl = get_sensor_bands('OLCI-anw', args)
+            required_wvl = get_sensor_bands('HICO-adag', args)
 
         try:
             required_wvl = np.array(required_wvl).flatten()

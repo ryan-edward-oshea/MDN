@@ -22,6 +22,7 @@ from MDN.benchmarks.multiple.GIOP.model                import model as GIOP_defa
 from MDN.benchmarks.multiple.QAA_initialized.model     import model as QAA_init
 from MDN.benchmarks.multiple.QAA.model                 import model as QAA_default
 from MDN.benchmarks.multiple.Gordon.model              import model as Gordon_init
+np.seterr(invalid='ignore')
 
 
 def return_spectral_array(multispectral_variable, args, normalize = True):
@@ -438,6 +439,7 @@ def main(kwargs,plot_matchups=False,run_bbp=False):
         if args.dataset == 'sentinel_paper':
             setattr(args, 'fix_tchl', True)
             setattr(args, 'seed', 1234)
+        import numpy  as np
 
         np.random.seed(args.seed)
         
@@ -514,7 +516,7 @@ def main(kwargs,plot_matchups=False,run_bbp=False):
 
         
         args.removed_dataset          = removed_dataset_holder
-        args.product                  = "aph,chl,tss,pc,ad,ag,cdom"
+        args.product                  = "aph,chl,tss,pc,ad,ag,cdom,anw"
         
         estimates, slices             = get_estimates(args, x_test = x_data, output_slices=slices, dataset_labels=locs[:,0])
         estimates                     = np.median(estimates, 0)
