@@ -528,11 +528,11 @@ def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None
                 ax2.grid(False)
                 ax2.set_yticklabels([])
                 if args.use_HICO_aph and product == 'aph':
-                    bands_aph = get_sensor_bands('HICO-aph', args)
+                    bands_aph = get_sensor_bands(f'{sensor}-aph', args)
                     ax2.set_ylabel(fr'$\mathbf{{{bands_aph[plt_idx]:.0f}nm}}$' f"\n" f"N={sum(np.isfinite(y_true))}", fontsize=20)
                 else:
                     if args.use_HICO_aph and (product == 'ad' or product == 'ag' ) :
-                        bands_adag = get_sensor_bands('HICO-adag', args)
+                        bands_adag = get_sensor_bands(f'{sensor}-adag', args)
                         ax2.set_ylabel(fr'$\mathbf{{{bands_adag[plt_idx]:.0f}nm}}$' f"\n" f"N={sum(np.isfinite(y_true))}", fontsize=20)
                     else:
                         ax2.set_ylabel(fr'$\mathbf{{{bands[plt_idx]:.0f}nm}}$' f"\n" f"N={sum(np.isfinite(y_true))}", fontsize=20)
@@ -1636,7 +1636,7 @@ def SAM(s1, s2):
         return 0.0
     return angle    
 
-def plot_bbp_spectra(wavelengths_aph,found_bbp_wavelengths,found_bbp_wavelengths_index,resample_wavelength_locations,bbp_dictionary,bbp_truth,classes_dict):  
+def plot_bbp_spectra(wavelengths_aph,found_bbp_wavelengths,found_bbp_wavelengths_index,resample_wavelength_locations,bbp_dictionary,bbp_truth,classes_dict,plot_prefix=''):  
     import matplotlib.pyplot as plt
     import matplotlib.ticker as mticker
 
@@ -1730,7 +1730,7 @@ def plot_bbp_spectra(wavelengths_aph,found_bbp_wavelengths,found_bbp_wavelengths
             # if index %3 !=0:
                 # ax.yaxis.set_ticklabels([])
 
-        plt.savefig(f'/home/ryanoshea/in_situ_database/Working_in_situ_dataset/bbp/Gordon_spectral_bbp_{j}.png',dpi=600)
+        plt.savefig(f'/home/ryanoshea/in_situ_database/Working_in_situ_dataset/bbp/{plot_prefix}_Gordon_spectral_bbp_{j}.png',dpi=600)
 
 
         plt.tight_layout()

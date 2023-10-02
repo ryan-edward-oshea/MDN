@@ -408,11 +408,14 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_boo
             if args.use_HICO_aph: 
                 if 'HICO' in args.sensor:   required_wvl =  get_sensor_bands('HICO-aph', args)#[409, 421, 432, 444, 455, 467, 478, 490, 501, 512, 524, 535, 547, 558, 570, 581, 593, 604, 616, 621, 633, 644, 650, 656, 667, 673, 679, 684, 690, 701, 713, 724,],
                 if 'PRISMA' in args.sensor: required_wvl =  get_sensor_bands('PRISMA-aph', args)#[409, 421, 432, 444, 455, 467, 478, 490, 501, 512, 524, 535, 547, 558, 570, 581, 593, 604, 616, 621, 633, 644, 650, 656, 667, 673, 679, 684, 690, 701, 713, 724,],
+                if 'PACE' in args.sensor:    required_wvl = get_sensor_bands('PACE-aph', args) #[443, 490, 547, 593, 644,]
 
         if 'ag' in name or 'ad' in name or 'bbp_Gordon' in name:
              if args.use_HICO_aph: 
                  if 'HICO' in args.sensor:    required_wvl = get_sensor_bands('HICO-adag', args) #[443, 490, 547, 593, 644,]
                  if 'PRISMA' in args.sensor:  required_wvl = get_sensor_bands('PRISMA-adag', args) #[443, 490, 547, 593, 644,]
+                 if 'PACE' in args.sensor:    required_wvl = get_sensor_bands('PACE-adag', args) #[443, 490, 547, 593, 644,]
+
         if '../MULT/bbp' == name :
              #if args.use_HICO_aph: 
             if 'HICO' in args.sensor:    required_wvl = get_sensor_bands('bbp', args) #[443, 490, 547, 593, 644,]
@@ -445,7 +448,7 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_boo
                         if v: new_data[j] = data[:, i]
                     data = np.array(new_data).T
                 else:
-                    data = data[:, get_valid(dloc.stem, loc, required_wvl,margin=4)]
+                    data = data[:, get_valid(dloc.stem, loc, required_wvl,margin=4,get_available=True if 'MULT' in name else False )]
 
             if 'cdom' in name and dloc.stem == 'ag':
                 data = data[:, find_wavelength(443, required_wvl)].flatten()[:, None]
@@ -457,12 +460,14 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_boo
                 return np.array([]).reshape((0,0))
             raise e
 
-    def get_valid(name, loc, required_wvl, margin=2):
+    def get_valid(name, loc, required_wvl, margin=2,get_available=False):
         ''' Dataset at <loc> must have all bands in <required_wvl> within <margin>nm '''
         if 'HYPER' in str(loc): margin=1
 
         # First, validate all required wavelengths are within the margin of an available wavelength
         wvls  = np.loadtxt(Path(loc).joinpath(f'{name}_wvl.csv'), delimiter=',')[:,None]
+        if get_available: required_wvl = wvls
+        
         check = np.array([np.abs(wvls-w).min() <= margin for w in required_wvl])
         assert(check.all()), '\n\t\t'.join([
             f'{name} is missing {(~check).sum()} wavelengths:',
@@ -498,6 +503,7 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_boo
     x_data = []
     y_data = []
     l_data = []
+    lat_lon_data = []
     for loc in locs:
         try:
             loc_data = [loadtxt(key, loc, wavelengths,args=args) for key in keys]
@@ -516,7 +522,7 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_boo
             if '../dataset' in keys: dataset_data  = [loc_data.pop(0)]
             if '../lat' in keys: lat_data  = [loc_data.pop(0)]
             if '../lon' in keys: lon_data  = [loc_data.pop(0)]
-            lat_lon_data = list(zip(lat_data[0].tolist(),lon_data[0].tolist()))
+            if '../lat' in keys and '../lon' in keys: lat_lon_data = list(zip(lat_data[0].tolist(),lon_data[0].tolist()))
             y_data  += [loc_data]
             if '../dataset' not in keys: l_data  += list(zip([loc.parent.name] * len(x_data[-1]), np.arange(len(x_data[-1])))) #if '../dataset' not in keys else
             
@@ -555,8 +561,8 @@ def _load_datasets(keys, locs, wavelengths, allow_missing=False,filter_ad_ag_boo
         y = [z for i,z in enumerate(y) if i not in drop]
 
     # Combine everything together
-    if lat_lon_data is not None: np.vstack(lat_lon_data)
-    l_data = np.vstack(l_data)
+    if lat_lon_data is not None and len(lat_lon_data): np.vstack(lat_lon_data)
+    if len(l_data): l_data = np.vstack(l_data)
     x_data = np.vstack(x_data)
 
     if len(keys) > 0:
@@ -698,7 +704,7 @@ def get_data(args):
             products = ['chl', 'tss', 'cdom', 'ad', 'ag', 'aph','bbp']# + ['a*ph', 'apg', 'a'] 
 
         data_folder = []
-        data_keys   = ['Rrs','../dataset','../lat','../lon']
+        data_keys   = ['Rrs','../dataset','../lat','../lon'] #'../dataset','../lat','../lon'
         data_path   = Path(args.data_loc)
         get_dataset = lambda path, p: Path(path.as_posix().replace(f'/{sensor}','').replace(f'/{p}.csv','')).stem
 

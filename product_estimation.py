@@ -42,32 +42,35 @@ def return_spectral_array(multispectral_variable, args, normalize = True):
 def get_bbp_estimates(Rrs,estimates,slices,args,outputs = ['Gordon']):
         sensor                        = args.sensor
         wavelengths                   = get_sensor_bands(args.sensor, args)
-
+        aph_wavelengths_len           = len(get_sensor_bands(args.sensor+'-aph', args))
         GIOP_initialization           =  {'chl' : estimates[:,slices['chl']],
                                           'aph' : estimates[:,slices['aph']],
-                                          'ad'  : return_spectral_array(estimates[:,slices['ad']],args,normalize=True)[:,0:50],
-                                          'ag'  : return_spectral_array(estimates[:,slices['ag']],args,normalize=True)[:,0:50]
+                                          'ad'  : return_spectral_array(estimates[:,slices['ad']],args,normalize=True)[:,0:aph_wavelengths_len], #[:,0:50]
+                                          'ag'  : return_spectral_array(estimates[:,slices['ag']],args,normalize=True)[:,0:aph_wavelengths_len], #[:,0:50]
                                           }
 
         QAA_initialization            =  {'chl' : estimates[:,slices['chl']],
                                           'aph' : estimates[:,slices['aph']],
-                                          'ad'  : return_spectral_array(estimates[:,slices['ad']],args,normalize=False)[:,0:50],
-                                          'ag'  : return_spectral_array(estimates[:,slices['ag']],args,normalize=False)[:,0:50]
+                                          'ad'  : return_spectral_array(estimates[:,slices['ad']],args,normalize=False)[:,0:aph_wavelengths_len],#[:,0:50],
+                                          'ag'  : return_spectral_array(estimates[:,slices['ag']],args,normalize=False)[:,0:aph_wavelengths_len],#[:,0:50]
                                           }
 
         GIOP_initialization['adg']    = (GIOP_initialization['ad'] + GIOP_initialization['ag'])/2
         bbp_estimates = {}
         
         if 'GIOP' in outputs:
-            bbp_estimates['GIOP-MDN']     = GIOP_init(   Rrs[:,0:50], wavelengths[0:50], sensor,**GIOP_initialization)
-            bbp_estimates['GIOP-default'] = GIOP_default(Rrs[:,0:50], wavelengths[0:50], sensor)
+            # bbp_estimates['GIOP-MDN']     = GIOP_init(   Rrs[:,0:50], wavelengths[0:50], sensor,**GIOP_initialization)
+            # bbp_estimates['GIOP-default'] = GIOP_default(Rrs[:,0:50], wavelengths[0:50], sensor)
 
+            bbp_estimates['GIOP-MDN']     = GIOP_init(   Rrs[:,0:aph_wavelengths_len], wavelengths[0:aph_wavelengths_len], sensor,**GIOP_initialization)
+            bbp_estimates['GIOP-default'] = GIOP_default(Rrs[:,0:aph_wavelengths_len], wavelengths[0:aph_wavelengths_len], sensor)
+            
         if 'QAA' in outputs:
-            bbp_estimates['QAA-MDN']     = QAA_init(    Rrs[:,0:50], wavelengths[0:50], sensor,**QAA_initialization)
-            bbp_estimates['QAA-default'] = QAA_default( Rrs[:,0:50], wavelengths[0:50], sensor)
+            bbp_estimates['QAA-MDN']     = QAA_init(    Rrs[:,0:aph_wavelengths_len], wavelengths[0:aph_wavelengths_len], sensor,**QAA_initialization)
+            bbp_estimates['QAA-default'] = QAA_default( Rrs[:,0:aph_wavelengths_len], wavelengths[0:aph_wavelengths_len], sensor)
             
         if 'Gordon' in outputs:
-            bbp_estimates['Gordon-MDN']      = Gordon_init( Rrs[:,0:50], wavelengths[0:50], sensor,**QAA_initialization)
+            bbp_estimates['Gordon-MDN']      = Gordon_init( Rrs[:,0:aph_wavelengths_len], wavelengths[0:aph_wavelengths_len], sensor,**QAA_initialization)
 
         return bbp_estimates
 
@@ -500,6 +503,9 @@ def main(kwargs,plot_matchups=False,run_bbp=False):
         import math, random
         random.seed(43)
         
+        
+        products_str = "aph,chl,tss,pc,ad,ag,cdom" #,anw
+        
         removed_dataset_holder        = args.removed_dataset
         args.removed_dataset          = "SeaBASS_bb\\Zimmerman_Richard\\Seagrass_Mapping_Florida\\Fwtic2010\\requested_files\\ODU\\archive"
         args.product                  = "bbp"
@@ -513,12 +519,10 @@ def main(kwargs,plot_matchups=False,run_bbp=False):
         wavelengths_aph               = get_sensor_bands(args.sensor+'-aph', args)
         wavelengths_bbp               = get_sensor_bands('bbp', args)
 
-
-        
         args.removed_dataset          = removed_dataset_holder
-        args.product                  = "aph,chl,tss,pc,ad,ag,cdom,anw"
+        args.product                  = products_str 
         
-        estimates, slices             = get_estimates(args, x_test = x_data, output_slices=slices, dataset_labels=locs[:,0])
+        estimates, slices             = get_estimates(args, x_test = Rrs, output_slices=slices, dataset_labels=locs[:,0])
         estimates                     = np.median(estimates, 0)
         
         bbp_dictionary                = get_bbp_estimates(Rrs=Rrs,estimates=estimates,slices=slices,args=args,outputs=['Gordon','GIOP','QAA'])
@@ -535,7 +539,7 @@ def main(kwargs,plot_matchups=False,run_bbp=False):
             except:
                 print(bbp_wavelength, "not found")
         
-        def get_OWT_classification(Rrs,wavelengths,k=3,shuffle=True):
+        def get_OWT_classification(Rrs,wavelengths,k=3,shuffle=True,sensor='HICO'):
             classes              = OWT_classification(Rrs,wavelengths,sensor= sensor)
             classes_dict         = {OWT:  [index for index,OWT_bool in enumerate(classes==OWT) if OWT_bool]  for OWT in range(1,8)}
             if shuffle:  
@@ -547,9 +551,29 @@ def main(kwargs,plot_matchups=False,run_bbp=False):
 
 
         # plot_bbp_error(bbp_Gordon,bbp_default_QAA,bbp_default_GIOP,bbp_truth,found_bbp_wavelengths,label='Gordon')
-        plot_bbp_error(bbp_dictionary,resample_wavelength_locations,found_bbp_wavelengths,found_bbp_wavelengths_index,bbp_truth=y_data,classes=classes,locs=locs,label='Gordon')
-        plot_bbp_spectra(wavelengths_aph,found_bbp_wavelengths,found_bbp_wavelengths_index,resample_wavelength_locations,bbp_dictionary,bbp_truth=y_data,classes_dict=classes_dict)
-                
+        # plot_bbp_error(bbp_dictionary,resample_wavelength_locations,found_bbp_wavelengths,found_bbp_wavelengths_index,bbp_truth=y_data,classes=classes,locs=locs,label='Gordon')
+        # plot_bbp_spectra(wavelengths_aph,found_bbp_wavelengths,found_bbp_wavelengths_index,resample_wavelength_locations,bbp_dictionary,bbp_truth=y_data,classes_dict=classes_dict,plot_prefix='MULT_bbp')
+        
+        
+        #Spectral Plots of Hyper bbp
+        data_loc_holder                            = args.data_loc
+        args.data_loc                              = "/home/ryanoshea/in_situ_database/Working_in_situ_dataset/Brice_Grunert_hyper_bbp_processed/"
+        args.product                               = "bbp"
+
+        x_data, y_data, slices, locs, lat_lon_data = get_data(args)
+        Rrs                                        = x_data
+        args.product                               = products_str
+        args.data_loc                              = data_loc_holder
+        estimates, slices                          = get_estimates(args, x_test = Rrs, output_slices=slices, dataset_labels=locs[:,0])
+        estimates                                  = np.median(estimates, 0)
+        bbp_dictionary                             = get_bbp_estimates(Rrs=Rrs,estimates=estimates,slices=slices,args=args,outputs=['Gordon','GIOP','QAA'])
+        wavelengths_bbp                            = np.array(range(430,705,5))
+        classes, classes_dict                      = get_OWT_classification(Rrs,wavelengths,k=3)
+         
+        plot_bbp_spectra(wavelengths_aph,found_bbp_wavelengths,found_bbp_wavelengths_index,resample_wavelength_locations,bbp_dictionary,bbp_truth=y_data,classes_dict=classes_dict,plot_prefix='hyper_bbp')
+
+
+        
         assert(0)
             
         
