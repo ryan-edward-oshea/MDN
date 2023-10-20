@@ -960,7 +960,7 @@ import math
 import numpy as np
 from MDN.metrics import mdsa
 
-def calc_spectral_slope(wavelengths,sample,reference_wavelength=443,min_wavelength=430,max_wavelength=650,slope_min_bound=0.005,slope_max_bound=0.03,allowed_error=10):
+def calc_spectral_slope(wavelengths,sample,reference_wavelength=443,min_wavelength=430,max_wavelength=650,slope_min_bound=0.005,slope_max_bound=0.03,allowed_error=10,ftol=1e-4, xtol=1e-3):
     from scipy.optimize import curve_fit
     wavelengths=np.array(wavelengths)
     sample=np.array(sample)
@@ -1007,7 +1007,7 @@ def convert_point_slope_to_spectral_cdom(CDOM,SCDOM,desired_wavelengths,referenc
 
 
 #Takes in available points and wavelengths and calculates point aand slope at 440 nm
-def convert_spectral_cdom_to_point_slope(wavelengths,spectral_CDOM,reference_CDOM_wavelength=443,spectral_min_max=[430,640],allowed_error = 100):
+def convert_spectral_cdom_to_point_slope(wavelengths,spectral_CDOM,reference_CDOM_wavelength=443,spectral_min_max=[430,640],allowed_error = 100,ftol=1e-4, xtol=1e-3):
     #Find all wavelengths in the spectral min/max region
     wavelengths = list(wavelengths)
     spectral_CDOM = list(spectral_CDOM)
@@ -1017,7 +1017,7 @@ def convert_spectral_cdom_to_point_slope(wavelengths,spectral_CDOM,reference_CDO
     #Calculate slope
     S_CDOM_min = 0.005 #https://www.oceanopticsbook.info/view/optical-constituents-of-the-ocean/level-2/commonly-used-models-for-iops-and-biogeochemistry
     S_CDOM_max = 0.030
-    wavelengths_OG, sample_OG, wavelengths_new,new_sample, params, sample_resized = calc_spectral_slope(wavelengths=bounded_wavelengths,sample=bounded_spectral_CDOM,reference_wavelength=reference_CDOM_wavelength,min_wavelength= min(spectral_min_max),max_wavelength=max(spectral_min_max) ,slope_min_bound=S_CDOM_min,slope_max_bound=S_CDOM_max,allowed_error=allowed_error)
+    wavelengths_OG, sample_OG, wavelengths_new,new_sample, params, sample_resized = calc_spectral_slope(wavelengths=bounded_wavelengths,sample=bounded_spectral_CDOM,reference_wavelength=reference_CDOM_wavelength,min_wavelength= min(spectral_min_max),max_wavelength=max(spectral_min_max) ,slope_min_bound=S_CDOM_min,slope_max_bound=S_CDOM_max,allowed_error=allowed_error,ftol=ftol, xtol=xtol)
     CDOM = params[0]
     SCDOM = params[1]
     

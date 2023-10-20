@@ -121,6 +121,7 @@ def model(Rrs, wavelengths, *args, **kwargs):
             - (absorb(get_band(412)) - zeta * absorb(get_band(443))) / (xi - zeta)
 
     a_dg = a_g443 * np.exp(S * (get_band(443) - wavelengths))
+    # a_dg = a_d(wavelengths) + a_g(wavelengths)
     a_ph = a(None) - a_dg - absorb(wavelengths) # differs from pdf doc; shown in spreadsheet    
 
     # Remove negatives

@@ -25,15 +25,16 @@ from ...utils import (
     loadtxt, to_rrs, closest_wavelength,
 )
 from ...meta import (
-    # g0_Gordon as g0, 
-    # g1_Gordon as g1,
-    g0_QAA as g0, 
-    g1_QAA as g1,
+    g0_Gordon as g0, 
+    g1_Gordon as g1,
+    # g0_QAA as g0, 
+    # g1_QAA as g1,
 )
 
 from scipy.interpolate import CubicSpline as Interpolate
 from pathlib import Path
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 @set_outputs(['a', 'ap', 'ag', 'aph', 'apg', 'adg', 'b', 'bbp']) # Define the output product keys
@@ -71,6 +72,44 @@ def model(Rrs, wavelengths, *args, **kwargs):
 
     b[b < 0] = 1e-5
 
+    aph = a_ph(lambda0)
+    ad  = a_d(lambda0)
+    ag  = a_g(lambda0)
+    Rrs_def = Rrs(lambda0)
+    rrs_def = rrs(lambda0)
+
+    #Make plots of Rrs, aph, ad, ag, a and b
+    if False:
+        for i in range(np.shape(aph)[0]):
+            # plt.figure()
+            fig, (ax1, ax2, ax3) = plt.subplots(3, 1)
+            ax1.plot(wavelengths,np.squeeze(aph[i,:].T), 'r',label='aph')
+            ax1.plot(wavelengths,np.squeeze(ad[i,:].T),  'g',label='ad')
+            ax1.plot(wavelengths,np.squeeze(ag[i,:].T),  'b',label='ag')
+            ax1.plot(wavelengths,np.squeeze(a[i,:].T),   'k',label='a')
+            ax1.legend(loc="upper right")
+            
+            ax1.set_title('Absorption')
+            
+            ax2.plot(wavelengths,np.squeeze(Rrs_def[i,:].T),   'r',label='Rrs')
+            ax2.plot(wavelengths,np.squeeze(rrs_def[i,:].T),   'k',label='rrs')
+            ax2.legend(loc="upper right")
+            ax2.set_title('Rrs')
+    
+            ax3.plot(wavelengths,np.squeeze(b[i,:].T),   'k',label='bbp')
+            ax3.plot(wavelengths,np.squeeze(((u(lambda0) * a) / (1 - u(lambda0)))[i,:].T),   'r',label='b')
+            ax3.plot(wavelengths,np.squeeze((u(lambda0))[i,:].T),   'g',label='u')
+            ax3.plot(wavelengths,np.squeeze((u(lambda0)* a)[i,:].T),   'c',label='u*a')
+    
+            ax3.set_title('b')
+    
+            ax3.legend(loc="upper right")
+            
+            fig.savefig(f'bbp/meta/Gordon_absorption_{i}.png')
+            plt.close('all')
+        
+    
+    
     
     # Return all backscattering and absorption parameters
     return {

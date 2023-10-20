@@ -25,13 +25,13 @@ from MDN.benchmarks.multiple.Gordon.model              import model as Gordon_in
 np.seterr(invalid='ignore')
 
 
-def return_spectral_array(multispectral_variable, args, normalize = True):
+def return_spectral_array(multispectral_variable, args=None, wavelengths_adg=None, wavelengths=None, normalize = True, ftol=1e-4, xtol=1e-3):
     adg_local = []
-    wavelengths_adg             = get_sensor_bands(args.sensor+'-adag', args)
-    wavelengths                 = get_sensor_bands(args.sensor, args)
+    if not wavelengths_adg: wavelengths_adg             = get_sensor_bands(args.sensor+'-adag', args)
+    if not wavelengths:     wavelengths                 = get_sensor_bands(args.sensor, args)
 
     for i in multispectral_variable:
-        adg_remote,Sadg_remote  = convert_spectral_cdom_to_point_slope(wavelengths_adg,i,reference_CDOM_wavelength=443,spectral_min_max=[400,700],allowed_error=100)
+        adg_remote,Sadg_remote  = convert_spectral_cdom_to_point_slope(wavelengths_adg,i,reference_CDOM_wavelength=443,spectral_min_max=[400,700],allowed_error=100,ftol=ftol, xtol=xtol)
         spectral_adg_remote     = convert_point_slope_to_spectral_cdom(adg_remote,Sadg_remote,wavelengths,reference_CDOM_wavelength=443)
         if normalize:
             adg_local.append(spectral_adg_remote/adg_remote)
@@ -39,20 +39,20 @@ def return_spectral_array(multispectral_variable, args, normalize = True):
             adg_local.append(spectral_adg_remote)
     return np.array(adg_local)
 
-def get_bbp_estimates(Rrs,estimates,slices,args,outputs = ['Gordon']):
+def get_bbp_estimates(Rrs,estimates,slices,args,outputs = ['Gordon'],ftol=1e-4, xtol=1e-3):
         sensor                        = args.sensor
         wavelengths                   = get_sensor_bands(args.sensor, args)
-        aph_wavelengths_len           = len(get_sensor_bands(args.sensor+'-aph', args))
+        aph_wavelengths_len           = len(get_sensor_bands(args.sensor.split('-')[0]+'-aph', args))
         GIOP_initialization           =  {'chl' : estimates[:,slices['chl']],
                                           'aph' : estimates[:,slices['aph']],
-                                          'ad'  : return_spectral_array(estimates[:,slices['ad']],args,normalize=True)[:,0:aph_wavelengths_len], #[:,0:50]
-                                          'ag'  : return_spectral_array(estimates[:,slices['ag']],args,normalize=True)[:,0:aph_wavelengths_len], #[:,0:50]
+                                          'ad'  : return_spectral_array(estimates[:,slices['ad']],args,normalize=True,ftol=ftol, xtol=xtol)[:,0:aph_wavelengths_len], #[:,0:50]
+                                          'ag'  : return_spectral_array(estimates[:,slices['ag']],args,normalize=True,ftol=ftol, xtol=xtol)[:,0:aph_wavelengths_len], #[:,0:50]
                                           }
 
         QAA_initialization            =  {'chl' : estimates[:,slices['chl']],
                                           'aph' : estimates[:,slices['aph']],
-                                          'ad'  : return_spectral_array(estimates[:,slices['ad']],args,normalize=False)[:,0:aph_wavelengths_len],#[:,0:50],
-                                          'ag'  : return_spectral_array(estimates[:,slices['ag']],args,normalize=False)[:,0:aph_wavelengths_len],#[:,0:50]
+                                          'ad'  : return_spectral_array(estimates[:,slices['ad']],args,normalize=False,ftol=ftol, xtol=xtol)[:,0:aph_wavelengths_len],#[:,0:50],
+                                          'ag'  : return_spectral_array(estimates[:,slices['ag']],args,normalize=False,ftol=ftol, xtol=xtol)[:,0:aph_wavelengths_len],#[:,0:50]
                                           }
 
         GIOP_initialization['adg']    = (GIOP_initialization['ad'] + GIOP_initialization['ag'])/2
@@ -107,7 +107,7 @@ def get_estimates(args, x_train=None, y_train=None, x_test=None, y_test=None, ou
         'avg_est'             : getattr(args, 'avg_est', False),
         'threshold'           : getattr(args, 'threshold', None),
         'confidence_interval' : getattr(args, 'CI', None),
-        'use_gpu'             : getattr(args, 'use_gpu', False),
+        'use_gpu'             : True,#getattr(args, 'use_gpu', False),
         'chunk_size'          : getattr(args, 'chunk_size', 1e3),
         'return_coefs'        : True,
     }
@@ -166,7 +166,7 @@ def get_estimates(args, x_train=None, y_train=None, x_test=None, y_test=None, ou
             (estimates, *confidence), coefs = model.predict(x_test, **predict_kwargs)
             #Add on bbp outputs if aph/ad/ag are available
             if all( [ product in args.product.split(',') for product in  ['aph','ad','ag']]):
-                bbp_estimates = get_bbp_estimates(Rrs=x_test,estimates=estimates,slices=model.output_slices,args=args)
+                bbp_estimates = get_bbp_estimates(Rrs=x_test,estimates=estimates,slices=model.output_slices,args=args,ftol=1e-1, xtol=1e-1)
                 bbp_gordon    = bbp_estimates['Gordon-MDN']['bbp']
                 if 'bbp' not in model.output_slices.keys():
                     model.output_slices['bbp'] = slice(np.shape(estimates)[1],np.shape(estimates)[1]+np.shape(bbp_gordon)[1])
@@ -362,7 +362,7 @@ def main(kwargs,plot_matchups=False,run_bbp=False):
         print(f'Saved data with shape {data_full.shape} to {filename}')
 
     # Train a model with partial data, and benchmark on remaining
-    elif args.benchmark:
+    elif args.benchmark and not run_bbp:
         import matplotlib.pyplot as plt
         plot_aph_vs_chl=False
         if plot_aph_vs_chl:
@@ -504,7 +504,7 @@ def main(kwargs,plot_matchups=False,run_bbp=False):
         random.seed(43)
         
         
-        products_str = "aph,chl,tss,pc,ad,ag,cdom" #,anw
+        products_str = "aph,chl,tss,pc,ad,ag,cdom,anw" #,anw
         
         removed_dataset_holder        = args.removed_dataset
         args.removed_dataset          = "SeaBASS_bb\\Zimmerman_Richard\\Seagrass_Mapping_Florida\\Fwtic2010\\requested_files\\ODU\\archive"
@@ -551,8 +551,8 @@ def main(kwargs,plot_matchups=False,run_bbp=False):
 
 
         # plot_bbp_error(bbp_Gordon,bbp_default_QAA,bbp_default_GIOP,bbp_truth,found_bbp_wavelengths,label='Gordon')
-        # plot_bbp_error(bbp_dictionary,resample_wavelength_locations,found_bbp_wavelengths,found_bbp_wavelengths_index,bbp_truth=y_data,classes=classes,locs=locs,label='Gordon')
-        # plot_bbp_spectra(wavelengths_aph,found_bbp_wavelengths,found_bbp_wavelengths_index,resample_wavelength_locations,bbp_dictionary,bbp_truth=y_data,classes_dict=classes_dict,plot_prefix='MULT_bbp')
+        plot_bbp_error(bbp_dictionary,resample_wavelength_locations,found_bbp_wavelengths,found_bbp_wavelengths_index,bbp_truth=y_data,classes=classes,locs=locs,label='Gordon')
+        plot_bbp_spectra(wavelengths_aph,found_bbp_wavelengths,found_bbp_wavelengths_index,resample_wavelength_locations,bbp_dictionary,bbp_truth=y_data,classes_dict=classes_dict,plot_prefix='MULT_bbp')
         
         
         #Spectral Plots of Hyper bbp
@@ -561,7 +561,7 @@ def main(kwargs,plot_matchups=False,run_bbp=False):
         args.product                               = "bbp"
 
         x_data, y_data, slices, locs, lat_lon_data = get_data(args)
-        Rrs                                        = x_data
+        Rrs                                        = x_data*np.pi
         args.product                               = products_str
         args.data_loc                              = data_loc_holder
         estimates, slices                          = get_estimates(args, x_test = Rrs, output_slices=slices, dataset_labels=locs[:,0])
