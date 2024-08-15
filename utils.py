@@ -315,6 +315,7 @@ def generate_config(args, create=True, verbose=True):
 	# Hash is always dependent upon these values
 	dependents = [getattr(act, 'dest', '') for group in [hypers, update] for act in group._group_actions]
 	dependents+= ['x_scalers', 'y_scalers']
+	if args.sensor == 'PRISMA': dependents+= ['allow_missing','allow_nan_inp','allow_nan_out','filter_ad_ag','min_in_out_val','removed_dataset']
 
 	# Hash is only partially dependent upon these values, assuming operation changes when using a feature
 	#  - 'use_' flags being set cause dependency
@@ -644,7 +645,7 @@ def get_data(args):
 		get_dataset = lambda path, p: Path(path.as_posix().replace(f'/{sensor}','').replace(f'/{p}.csv','')).stem
 
 		for product in products:
-			if product in ['chl', 'tss', 'cdom']:
+			if product in ['chl', 'tss', 'cdom','pc']:
 				product = f'../{product}'
 		
 			# Find all datasets with the given product available
