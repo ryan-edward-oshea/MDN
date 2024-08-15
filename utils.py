@@ -315,7 +315,7 @@ def generate_config(args, create=True, verbose=True):
 	# Hash is always dependent upon these values
 	dependents = [getattr(act, 'dest', '') for group in [hypers, update] for act in group._group_actions]
 	dependents+= ['x_scalers', 'y_scalers']
-	if args.sensor == 'PRISMA': dependents+= ['allow_missing','allow_nan_inp','allow_nan_out','filter_ad_ag','min_in_out_val','removed_dataset']
+	if args.sensor == 'PRISMA' or args.sensor=='HICO' and args.product=='aph,chl,tss,pc,ad,ag,cdom': dependents+= ['allow_missing','allow_nan_inp','allow_nan_out','filter_ad_ag','min_in_out_val','removed_dataset']
 
 	# Hash is only partially dependent upon these values, assuming operation changes when using a feature
 	#  - 'use_' flags being set cause dependency
