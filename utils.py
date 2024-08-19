@@ -12,6 +12,22 @@ import pickle as pkl
 import numpy as np 
 import hashlib, re, warnings, functools, sys, zipfile
 
+def download_weights(model_path_name):
+    import subprocess, MDN, os
+    
+    MDN_folder  = os.path.dirname(MDN.__file__) + '/Weights/'
+    
+    downloadable_weights = {
+     '6041caec3d8c34771f9082740fc3cee1a16d3b1b21cfda0f245e615a0a01570d' : ["PRISMA",MDN_folder + 'PRISMA/6041caec3d8c34771f9082740fc3cee1a16d3b1b21cfda0f245e615a0a01570d.zip',"https://nasagov.box.com/shared/static/6m6hk18cpln772dgsbm6hl2scigmjebz.zip"],
+     'b978ee38b759569c6c6860a6a875f23131cef5ecf5b93d0d67708cb408718c85' : ["HICO",  MDN_folder + 'HICO/b978ee38b759569c6c6860a6a875f23131cef5ecf5b93d0d67708cb408718c85.zip',  "https://nasagov.box.com/shared/static/c0ginufcrujc8v7yr5mk7j4komoog00p.zip"],
+     }
+
+    if  model_path_name in downloadable_weights.keys(): 
+        sensor,dest,link = downloadable_weights[model_path_name]
+        if not os.path.isfile(dest):
+            os.makedirs(os.path.dirname(dest),  exist_ok=True)
+            print("Downloading model weights...")
+            subprocess.run(["curl","-L",link,  "-o",dest])
 
 def ignore_warnings(func):
 	''' Decorator to silence all warnings (Runtime, User, Deprecation, etc.) '''
@@ -346,6 +362,7 @@ def generate_config(args, create=True, verbose=True):
 	uid    = hashlib.sha256(h_str.encode('utf-8')).hexdigest()
 	folder = root.joinpath(uid)
 	c_file = folder.joinpath('config')
+	download_weights(folder.stem)
 	try: uncompress(folder) # Unzip the archive if necessary
 	except: raise Exception('Weights have not yet been downloaded - please run "git lfs install" and then "git lfs pull" inside the repository folder')
 	
