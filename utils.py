@@ -20,6 +20,8 @@ def download_weights(model_path_name):
     downloadable_weights = {
      '6041caec3d8c34771f9082740fc3cee1a16d3b1b21cfda0f245e615a0a01570d' : ["PRISMA",MDN_folder + 'PRISMA/6041caec3d8c34771f9082740fc3cee1a16d3b1b21cfda0f245e615a0a01570d.zip',"https://nasagov.box.com/shared/static/6m6hk18cpln772dgsbm6hl2scigmjebz.zip"],
      'b978ee38b759569c6c6860a6a875f23131cef5ecf5b93d0d67708cb408718c85' : ["HICO",  MDN_folder + 'HICO/b978ee38b759569c6c6860a6a875f23131cef5ecf5b93d0d67708cb408718c85.zip',  "https://nasagov.box.com/shared/static/c0ginufcrujc8v7yr5mk7j4komoog00p.zip"],
+     '6643ade4f109db3d9e0dc8d5bbae613441cd7ed95863320040688ab2e4afe0d8' : ["PACE",  MDN_folder + 'PACE/6643ade4f109db3d9e0dc8d5bbae613441cd7ed95863320040688ab2e4afe0d8.zip',  "https://nasagov.box.com/shared/static/aatfzwn0e2ezdrizib38skett6tawred.zip"],
+     'd3ebd0b61b79f3fc1dc8fe8c83cb144fca54ad4a93e951cd3cddd728625b7733' : ["PACE",  MDN_folder + 'PACE/d3ebd0b61b79f3fc1dc8fe8c83cb144fca54ad4a93e951cd3cddd728625b7733.zip',  "https://nasagov.box.com/shared/static/81pa0tv6uklxt1vko3jt7l1mgmpmgraz.zip"],
      }
 
     if  model_path_name in downloadable_weights.keys(): 
@@ -331,7 +333,7 @@ def generate_config(args, create=True, verbose=True):
 	# Hash is always dependent upon these values
 	dependents = [getattr(act, 'dest', '') for group in [hypers, update] for act in group._group_actions]
 	dependents+= ['x_scalers', 'y_scalers']
-	if args.sensor == 'PRISMA' or args.sensor=='HICO' and args.product=='aph,chl,tss,pc,ad,ag,cdom': dependents+= ['allow_missing','allow_nan_inp','allow_nan_out','filter_ad_ag','min_in_out_val','removed_dataset']
+	if args.sensor in ['PRISMA','HICO','PACE'] and args.product=='aph,chl,tss,pc,ad,ag,cdom': dependents+= ['allow_missing','allow_nan_inp','allow_nan_out','filter_ad_ag','min_in_out_val','removed_dataset']
 
 	# Hash is only partially dependent upon these values, assuming operation changes when using a feature
 	#  - 'use_' flags being set cause dependency
