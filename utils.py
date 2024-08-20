@@ -11,9 +11,25 @@ from tqdm import trange
 import pickle as pkl
 import numpy as np 
 import hashlib, re, warnings, functools, sys, zipfile
+import subprocess, MDN, os
 
+def uncompress(path, overwrite=False):
+	''' Uncompress a .zip archive '''
+	if overwrite or not path.exists():
+		if path.with_suffix('.zip').exists():
+			with zipfile.ZipFile(path.with_suffix('.zip'), 'r') as zf:
+				zf.extractall(path)
+                
+def download_example_imagery():
+    link = "https://nasagov.box.com/shared/static/kq3kcnttgammmtq281elqaa4934fttnj.zip"
+    dest = os.getcwd() + "/example_imagery/example_imagery.zip"
+    if not os.path.isfile(dest):
+        os.makedirs(os.path.dirname(dest),  exist_ok=True)
+        subprocess.run(["curl","-L",link,  "-o",dest])
+        with zipfile.ZipFile(dest, 'r') as zf:
+            zf.extractall(Path(os.getcwd() + "/example_imagery/"))
+            
 def download_weights(model_path_name):
-    import subprocess, MDN, os
     
     MDN_folder  = os.path.dirname(MDN.__file__) + '/Weights/'
     
@@ -118,12 +134,7 @@ def compress(path, overwrite=False):
 				zf.write(item, item.relative_to(path))
 
 
-def uncompress(path, overwrite=False):
-	''' Uncompress a .zip archive '''
-	if overwrite or not path.exists():
-		if path.with_suffix('.zip').exists():
-			with zipfile.ZipFile(path.with_suffix('.zip'), 'r') as zf:
-				zf.extractall(path)
+
 
 
 class CustomUnpickler(pkl.Unpickler):
