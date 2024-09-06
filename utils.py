@@ -13,6 +13,31 @@ import numpy as np
 import hashlib, re, warnings, functools, sys, zipfile
 import subprocess, MDN, os
 
+supported_models = {
+	'OLI': ['chl,tss,cdom', 'chl'],
+
+	'OLCI': ['chl,tss,cdom', 'chl'],
+
+	'MSI': ['chl,tss,cdom', 'chl'],
+
+	'S3A': ['chl,tss,cdom,pc'],
+	'S3B': ['chl,tss,cdom,pc'],
+
+	'HICO': ['aph,chl,tss,pc,ad,ag,cdom'],
+
+	'PRISMA': ['aph,chl,tss,pc,ad,ag,cdom'],
+	'PACE': ['aph,chl,tss,pc,ad,ag,cdom'],
+	'PACE-sat': ['aph,chl,tss,pc,ad,ag,cdom'],
+
+}
+
+def current_support():
+	ctr = 1
+	for key in supported_models:
+		for item in supported_models[key]:
+			print(f'Model-{ctr}: predicts {item} from {key} data')
+			ctr+=1
+
 def uncompress(path, overwrite=False):
 	''' Uncompress a .zip archive '''
 	if overwrite or not path.exists():
@@ -20,14 +45,35 @@ def uncompress(path, overwrite=False):
 			with zipfile.ZipFile(path.with_suffix('.zip'), 'r') as zf:
 				zf.extractall(path)
                 
-def download_example_imagery():
-    link = "https://nasagov.box.com/shared/static/kq3kcnttgammmtq281elqaa4934fttnj.zip"
-    dest = os.getcwd() + "/example_imagery/example_imagery.zip"
-    if not os.path.isfile(dest):
-        os.makedirs(os.path.dirname(dest),  exist_ok=True)
-        subprocess.run(["curl","-L",link,  "-o",dest])
-        with zipfile.ZipFile(dest, 'r') as zf:
-            zf.extractall(Path(os.getcwd() + "/example_imagery/"))
+def download_example_imagery(sensor, date, location):
+
+	if sensor =="HICO" and date=="09-08-2014" and location=="Lake Erie":
+		link = "https://nasagov.box.com/shared/static/0i6b4j9m29ilyip20y8k37kjzorra98k.nc"
+	elif sensor =="OLI" and date=="03-16-2019" and location=="San Francisco Bay":
+		link = "https://nasagov.box.com/shared/static/3m9u778rzlnbs0bftm1o2527ctigg4vf.nc"
+		rgb_link = "https://nasagov.box.com/shared/static/iekn2w8tjygvh66o8e1uiwsgq42hipzu.png"
+	elif sensor =="OLCI" and date=="08-29-2016" and location=="Lake Erie":
+		link = "https://nasagov.box.com/shared/static/96yy3e4d89clyaeixpgsj31lcgjbhbx6.nc"
+		rgb_link = "https://nasagov.box.com/shared/static/6e30vvypp0ryy43u3yh2tenh5fy766ac.png"
+	elif sensor =="OLCI" and date=="06-08-2018" and location=="Utah Lake":
+		link = "https://nasagov.box.com/shared/static/ksq9yqgfhu5ae4rffakjdgv6v66tcral.nc"
+		rgb_link = "https://nasagov.box.com/shared/static/zz68knzmjfjkzy7u5hkmrlb7i1y10rv3.png"
+	elif sensor =="OLCI" and date=="03-16-2019" and location=="San Francisco Bay":
+		link = "https://nasagov.box.com/shared/static/klco8ktabzboixnqeghtc9syms7j9q07.nc"
+		rgb_link = "https://nasagov.box.com/shared/static/qcsexizc55g3hxl3ez29pzr01gvrrpcg.png"
+	else:
+		assert True, f"No images found for {location} from the {sensor} sensor on {date}"
+
+	dest = os.getcwd() + f"/data/example_imagery/{sensor}/{date}/{location}/sat_cube.nc"
+	rgb_dest=  os.getcwd() + f"/data/example_imagery/{sensor}/{date}/{location}/sat_rgb.png"
+	if not os.path.isfile(dest):
+		os.makedirs(os.path.dirname(dest),  exist_ok=True)
+		subprocess.run(["curl","-L",link,  "-o",dest])
+		subprocess.run(["curl", "-L", rgb_link, "-o", rgb_dest])
+        #with zipfile.ZipFile(dest, 'r') as zf:
+            #zf.extractall(Path(os.getcwd() + "/example_imagery/"))
+
+	return dest
             
 def download_weights(model_path_name):
     

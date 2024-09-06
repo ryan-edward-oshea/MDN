@@ -33,7 +33,7 @@ parser.add_argument("--LOO_CV",    action ="store_true", help="Leave-one-out cro
 
 ''' Flags which require model retrain if changed '''
 update = parser.add_argument_group('Model Parameters', 'Parameters which require a new model to be trained if they are changed')
-update.add_argument("--sat_bands", default=True, action ="store_true", help="Use bands specific to certain products when utilizing satellite retrieved spectra")
+update.add_argument("--sat_bands", default=False, action ="store_true", help="Use bands specific to certain products when utilizing satellite retrieved spectra")
 update.add_argument("--benchmark", default=False, action ="store_true", help="Train only on partial dataset, and use remaining to benchmark")
 update.add_argument("--product",   default="chl,tss,cdom,pc",        help="Product to estimate")
 update.add_argument("--sensor",    default="S3B",        help="Sensor to estimate from (See meta.py for available options)")
