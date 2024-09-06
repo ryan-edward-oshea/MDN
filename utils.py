@@ -326,7 +326,7 @@ def get_tile_data(filenames, sensor, allow_neg=True, rhos=False, anc=False, **kw
 	from netCDF4 import Dataset
 
 	filenames = np.atleast_1d(filenames) 
-	features  = ['rhos' if rhos else 'Rrs'] + (ANCILLARY if anc or rhos else [])
+	features  = ['rhos' if rhos else 'Rrs'] + (ANCILLARY if anc and rhos else [])
 	data      = {}
 	available = []
 
