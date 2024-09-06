@@ -370,7 +370,28 @@ def get_tile_data(filenames, sensor, allow_neg=True, rhos=False, anc=False, **kw
 	assert(len(data) == len(features)), f'Missing features: Found {list(data.keys())}, Expecting {features}'
 	return bands, np.dstack([data[f] for f in features])
 
+def get_tile_geographic_info(file_name, **kwargs):
+	from netCDF4 import Dataset
 
+	with Dataset(file_name, 'r') as nc_data:
+		if 'navigation_data' in nc_data.groups.keys():
+			nc_data = nc_data['navigation_data']
+
+		lon_k, lat_k = ('lon', 'lat') if 'lon' in nc_data.variables.keys() else ('longitude', 'latitude')
+		lon, lat = nc_data.variables[lon_k][:], nc_data.variables[lat_k][:]
+
+		if len(lon.shape) == 1:
+			lon, lat = np.meshgrid(lon, lat)
+
+	lon[lon < -180] = np.nan
+	lat[lat < -180] = np.nan
+
+	lon.mask = False
+	lat.mask = False
+
+	extent = np.nanmin(lon), np.nanmax(lon), np.nanmin(lat), np.nanmax(lat)
+	return lon, lat, extent
+	
 def generate_config(args, create=True, verbose=True):
 	''' 
 	Create a config file for the current settings, and store in
