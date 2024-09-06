@@ -341,7 +341,7 @@ def find_rgb_img_nc(file_name, sensor, rhos=True):
     """
     'Get the image data and an RGB composite of the scene'
     if "L1B" not in str(file_name):
-        wvl_bands, img = get_tile_data(file_name, sensor, rhos=rhos)
+        wvl_bands, img = get_tile_data(file_name, sensor, rhos=rhos,allow_neg=True)
         wvl_bands = np.asarray(wvl_bands)
     else:
         import netCDF4
