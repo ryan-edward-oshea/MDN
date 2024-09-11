@@ -25,15 +25,23 @@ def get_mdn_preds(test_x, args=None, sensor="OLCI", products="chl", mode="point"
 
     Inputs
     ------
-      a) args: The arguments for the MDN. By default None are provided.
-      b) sensor: The sensor for which predictions are needed. This argument in only used if args is not provided.
+        a) test_x: A numpy array with the data on which we want to generate the predictions. Each row of this matrix
+                  corresponds to a test spectral samples.
+        b) args: The arguments for the MDN. [Default: None]
+        c) sensor: The sensor for which predictions are needed. This argument in only used if args is not provided.
                  [Default: "OLCI"]
-      c) products: The products which will be predicted by the model. This argument is only used if args is not
+        d) products: The products which will be predicted by the model. This argument is only used if args is not
                    provided. [Default: "chl"]
-      d) test_x: A numpy array with the data on which we want to generate the predictions. Each row of this matrix corr-
-                 esponds to a new spectral samples. [Default: None]
-      e) mode:   A flag that signifies whether full MDN output suite is to be produced or just point estimates. The
+        e) mode:   A flag that signifies whether full MDN output suite is to be produced or just point estimates. The
                  modes currently supported are 'full' and 'point'
+        f) verbose:   A boolean flag that controls how much information is printed out to the console
+
+    Outputs
+    -------
+        a) mdn_preds: In the 'full' mode the output predictions is a list which contains all the different output compo-
+        nents of the MDN output. In the point mode it generates a numpy array that is the best estimate of the output
+        for each sample (row) for each WQI (column)
+        b) op_slices: A dictionary indicating the slices corresponding to the different output variables.
     """
 
     if args == None:
@@ -106,23 +114,63 @@ def get_mdn_preds(test_x, args=None, sensor="OLCI", products="chl", mode="point"
 
     print('finished')
 
+def arg_median(X, axis=0):
+    """
+    This function can be used to identify the location of the sample which corresponds to the median in the specific
+    samples.
+
+    Inputs
+    ------
+    :param X:[np.ndarray]
+    A numpy array in which we want to find the position of the median from the samples
+
+    :param axis: [int] (Default: 0)
+    An integer axis along which we are doing this process
+
+    Outputs
+    ------
+
+    A numpy array of the median location
+    """
+    assert isinstance(X, np.ndarray), "The variable <X> must be a numpy array"
+    assert isinstance(axis, int) and axis >= 0, f"The variable <axis> must be a integer >= 0"
+    assert axis <= len(X.shape), f"Given matrix has {len(X.shape)} dimensions, but asking meidan along axis {axis}" \
+                                 f"dimension"
+
+    'Find the median along axis of interest'
+    amedian = np.nanmedian(X, axis=axis)
+
+    'Find difference from median'
+    aabs = np.abs((X.T - np.expand_dims(amedian.T, axis=-1))).T
+
+    'Find the sample with smallest difference'
+    return np.nanargmin(aabs, axis=axis)
+
 
 def get_mdn_uncert_ensemble(ensmeble_distribution, estimates, scaler_y_list, scaler_mode="invert"):
     """
     This function accepts the a dictionary with the distribution details for the entire ensemble and calculates the
     uncertainty for the entire ensmeble
 
+    Inputs
+    ------
     :param ensmeble_distribution (list of dictionaries)
     A dictionary that has all the distribution information provided by Brandons MDN package
+
+    :param estimates (np.ndarray)
+    A numpy array that contains the estimates from each of the ensemble models for the MDN
 
     :param scaler_y_list (list of model scalers)
     To convert uncertianty to appropriate scale
 
     :param scaler_models (str from ['invert', 'non_invert']) [Default: "invert"]
 
-    :return: ensmeble_uncertainties (list)
+    Outputs
+    ------
+    :param ensmeble_uncertainties (list)
     A list containing the uncertainties for the entire ensemble set
     """
+
 
     assert scaler_mode in ["invert", "non_invert"], f"Only two available options for <scaler_mode> are 'invert' and" \
                                                     f"'non_invert"
@@ -166,14 +214,14 @@ def get_mdn_uncert_ensemble(ensmeble_distribution, estimates, scaler_y_list, sca
         lim1 = np.asarray(scaler_y.transform(np.median(estimates+1e-6, axis=0))) - np.asarray(final_uncertainties)
         lim2 = np.asarray(scaler_y.transform(np.median(estimates+1e-6, axis=0))) + np.asarray(final_uncertainties)
 
-        sd = np.squeeze(0.5 * (scaler_y.inverse_transform(lim2) - scaler_y.inverse_transform(lim1)))
+        sd = np.squeeze(1 * (scaler_y.inverse_transform(lim2) - scaler_y.inverse_transform(lim1)))
 
         return sd
     else:
         return np.asarray(final_uncertainties)
 
 def map_cube(img_data, wvl_bands, sensor, products='chl,tss,cdom', land_mask=False, landmask_threshold=0.0,
-             flg_subsmpl=False, flg_uncert=False, subsmpl_rate=10, slices=None, scaler_mode="invert",
+             flg_subsmpl=False, subsmpl_rate=10, flg_uncert=False, slices=None, scaler_mode="invert",
              block_size=10000):
     """
     This function is used tomap the pixels in a 3D numpy array, in terms of both parameters and the associated
@@ -190,9 +238,6 @@ def map_cube(img_data, wvl_bands, sensor, products='chl,tss,cdom', land_mask=Fal
 
     :param products: [str] (Default:"chl,tss,cdom")
     The products we want to estimate using this model.
-
-    :param rhos_flag: [Bool] (default: False)
-    Whether the maps use the classical Rrs or the more questionable Rhos
 
     :param land_mask: [Bool] (default: False)
     Should a heuristic be applied to mask out the land pixels
@@ -216,7 +261,18 @@ def map_cube(img_data, wvl_bands, sensor, products='chl,tss,cdom', land_mask=Fal
     :param scaler_modes: [str in ['invert', 'non_invert']] (Default: 'non_invert')
     Is the uncertainty inverted using the MDN's intrinsic scaler
 
+    :param block_size: [int] (Default: 10000)
+    The size of the spectral block that is being processed for at once
+
     :return:
+    model_preds: [np.ndarray]
+    A prediction for each valid sample in the input image
+
+    img_uncert: [np.ndarray] (OPTIONAL)
+    Only generated when flg_ucncert is true. Encapsulates the prediction uncertainty for each sample for each output.
+
+    op_slices: [dictionary]
+    The output slices of the various products.
     """
 
     assert isinstance(img_data, np.ndarray), "The <image_data> variable must be a numpy array"
@@ -367,3 +423,4 @@ def map_cube(img_data, wvl_bands, sensor, products='chl,tss,cdom', land_mask=Fal
         img_uncert = np.zeros((img_data.shape[:-1]))
 
     return model_preds, img_uncert, op_slices
+

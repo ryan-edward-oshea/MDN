@@ -213,7 +213,8 @@ def get_gloria_samples(sensor="OLCI", bg_var=['chl', 'tss', 'cdom'],
     A numpy array where each row corresponds to a different sample and each column a specific measured IOP from the
     GLORIA dataset
 
-    anc_details:
+    gid:[np.ndarray: nSamples X 1]
+    The gloria id for the samples
     """
 
     assert sensor in SUPPORTED_SENSORS, f"The tool does not currently support the Sensor: {sensor}"

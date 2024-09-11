@@ -78,6 +78,7 @@ class TransformerPipeline(_CustomTransformer):
 
 	def _transform(self, X, *args, **kwargs):
 		for scaler in self.scalers:
+			scaler.clip= False
 			X = scaler.transform(X, *args, **kwargs)
 		return X
 

@@ -118,14 +118,17 @@ def create_scatterplots_trueVsPred(y_true, y_pred, short_name=None, x_label=None
     A list of strings which will be placed inside each subplot. Can be used to place the error metrics of the
     predictions inside the subplot window
 
+    :param title: [str] (Default: "Model Performance")
+    The title to be placed at the top of the image file
+
     :param minv_b: [list: nVariables] (Default: [-1]* nVariables)
     The smallest value on the scatter plot
 
     :param maxv_b: [list: nVariables] (Default: [1]* nVariables)
     The largest value on the scatter plot
 
-    :param suptitle:[str] (Default: None)
-    String title on top of the plot
+    :param ipython_mode:[bool] (Default: False)
+    In the ipython_mode, the images are auto displayed and figure is not returned by the function
 
     :return:
     """
@@ -295,9 +298,15 @@ def find_rgb_img(img, wvl_bands, PRISMA_mode=False):
     """
     This function can be used extract the RB composite from a image cube
 
-    :param img:
-    :param wvl_bands:
-    :param sensor
+    :param img: [np.ndarray: nRows X nCols X nBands]
+    The image cube we are extracting the RGB image from.
+
+    :param wvl_bands:[np.ndarray: nBands]
+    The actual wavelength bands
+
+    :param PRISMA_mode[bool] (Default: False)
+    A variable that controls the exact way in which the RGB is rescaled for visualization.
+
     :return:
     """
     assert img.shape[2] == len(wvl_bands), " Wavelengths should be associated with each band in the cube"
@@ -335,8 +344,15 @@ def find_rgb_img_nc(file_name, sensor, rhos=True):
     """
     This function can be used extract the RB composite from a NetCDF file
 
-    :param file_name:
-    :param sensor:
+    :param file_name: [str]
+    The physical address of the file to be read
+
+    :param sensor: [str]
+    The sensor resoloution which the image is being read at
+
+    :param rhos: [bool] (Default: True)
+    The flag which decides whether the function uses rhos or Rrs
+
     :return:
     """
     'Get the image data and an RGB composite of the scene'
@@ -374,19 +390,30 @@ def find_rgb_img_nc(file_name, sensor, rhos=True):
             temp = np.squeeze(img_rgb[:, :, ii])
             temp[temp < 0] = 0
             temp = interpolate(temp, 0.05)
-            img_rgb[:, :, ii] = 1. * temp
+            img_rgb[:, :, ii] = 0.7 * temp
 
     return img_rgb
 
 
 def display_sat_rgb(file_name, sensor, figsize=(15, 5), title=None, ipython_mode=False):
     """
-    This function is used display a specific satellite image with the geographic extents.
+    This function can be used extract an RGB image by using the rhos data present in a netCDF file
 
-    :param rgb_img
-    :param fig_size
-    :param title
+    :param file_name: [str]
+    The physical address of the file to be read
 
+    :param sensor: [str]
+    The sensor resoloution which the image is being read at
+
+    :param figsize: (tuple with 2 ints)
+    The size of the figure to be plotted
+
+    :param title:[str]
+    The title to be added to the matplotlib figure
+
+    :param ipython_mode:[bool] (Default: False)
+    In the ipython_mode, the images are auto displayed and figure is not returned by the function
+    :return:
     """
 
     'Get the geographic information'
@@ -430,6 +457,9 @@ def overlay_rgb_mdnProducts(rgb_img, model_preds, extent, img_uncert=None, produ
 
     :param product_name: (string) (Default: "Parameter")
     The name of the product that has been predicted
+
+    :param ipython_mode:[bool] (Default: False)
+    In the ipython_mode, the images are auto displayed and figure is not returned by the function
 
     :return: fig1: A figure with appropriate plots
     """
