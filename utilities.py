@@ -9,17 +9,20 @@ Date Created:   September 2nd, 2024
 
 import numpy as np
 import sys
+from tqdm import tqdm
+from tqdm import tqdm
 
 from .product_estimation import get_estimates
 from .parameters import get_args
 from .meta import get_sensor_bands
+from .utils import mask_land
 from .uncertainty_package_final.uncert_support_lib import get_sample_uncertainity
 
 'Base properties for imshow'
 ASPECT = 'auto'
 cmap = 'jet'
 
-def get_mdn_preds(test_x, args=None, sensor="OLCI", products="chl", mode="point", verbose=False):
+def get_mdn_preds(test_x, args=None, sensor="OLCI", products="chl", mode="point", model_type='production', verbose=False):
     """
     This function is used to generate estimates from pre-trained MDN
 
@@ -34,7 +37,9 @@ def get_mdn_preds(test_x, args=None, sensor="OLCI", products="chl", mode="point"
                    provided. [Default: "chl"]
         e) mode:   A flag that signifies whether full MDN output suite is to be produced or just point estimates. The
                  modes currently supported are 'full' and 'point'
-        f) verbose:   A boolean flag that controls how much information is printed out to the console
+        f) model_type:  A flag that signifies whether we use a model trained on the full GLORIA data or a reduced test
+                        set
+        g) verbose:   A boolean flag that controls how much information is printed out to the console
 
     Outputs
     -------
@@ -44,6 +49,9 @@ def get_mdn_preds(test_x, args=None, sensor="OLCI", products="chl", mode="point"
         b) op_slices: A dictionary indicating the slices corresponding to the different output variables.
     """
 
+    assert  model_type in ['production', 'testing'], f"Currently the toolbox only supports two model types" \
+                                                     f" 'production' and 'testing'. Instead got '{model_type}'."
+
     if args == None:
         print("MDN model settings not provided by user!")
         print(f"Looking for model at {sensor} resolution predicting {products}!!")
@@ -52,6 +60,7 @@ def get_mdn_preds(test_x, args=None, sensor="OLCI", products="chl", mode="point"
         kwargs = {'product': products,
                   'sat_bands': True if products == 'chl,tss,cdom,pc' else False,
                   # 'data_loc'     : 'D:/Data/Insitu',
+                  'model_loc': "Weights" if model_type == 'production' else "Weights_test",
                   'sensor': sensor}
 
         if sensor == 'PRISMA' or sensor == 'HICO' or sensor == 'PACE' and products == 'aph,chl,tss,pc,ad,ag,cdom':
@@ -186,7 +195,7 @@ def get_mdn_uncert_ensemble(ensmeble_distribution, estimates, scaler_y_list, sca
     'Get the scaler'
     scaler_y = scaler_y_list[0]
     'iterate over models'
-    for item in ensmeble_distribution:
+    for item in tqdm(ensmeble_distribution):
         dist = {'pred_wts': item[0], 'pred_mu': item[1],
                 'pred_sigma': item[2]}
 

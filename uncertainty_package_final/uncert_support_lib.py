@@ -37,7 +37,7 @@ def get_sample_uncertainity(pred_dist, compress=False):
     #aleatoric, epistemic = np.zeros((pred_dist['pred_mu'].shape[0],pred_dist['pred_mu'][0, :].shape[0], pred_dist['pred_mu'][0, :].shape[0])), \
     #                      np.zeros((pred_dist['pred_mu'].shape[0],pred_dist['pred_mu'][0, :].shape[0]))
     aleatoric, epistemic = np.squeeze(np.zeros((pred_dist['pred_mu'].shape))), np.squeeze(np.zeros((pred_dist['pred_mu'].shape)))
-    for ii in tqdm(range(pred_dist['pred_wts'].shape[0])):
+    for ii in range(pred_dist['pred_wts'].shape[0]):
         #pi = pred_dist['pred_wts'][ii, :]
         #mu = pred_dist['pred_mu'][ii, :]
         #var = pred_dist['pred_sigma'][ii, :]
