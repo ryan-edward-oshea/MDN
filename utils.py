@@ -321,7 +321,7 @@ def _get_tile_wavelengths(nc_data, key, sensor, allow_neg=True, landmask=False, 
 		return bands, data.filled(fill_value=np.nan)
 	return [], np.array([])
 
-def get_tile_data(filenames, sensor, allow_neg=True, rhos=False, anc=False,landmask=False, **kwargs):
+def get_tile_data(filenames, sensor, allow_neg=True, rhos=False, anc=False,landmask=False,flipud=False, **kwargs):
 	''' Gather the correct Rrs/rhos bands from a given scene, as well as ancillary features if necessary '''
 	from netCDF4 import Dataset
 
@@ -368,6 +368,7 @@ def get_tile_data(filenames, sensor, allow_neg=True, rhos=False, anc=False,landm
 		data['time_diff'] = np.zeros_like(data[features[0]][:, :, 0])
 
 	assert(len(data) == len(features)), f'Missing features: Found {list(data.keys())}, Expecting {features}'
+	if flipud: return bands, np.flipud(np.dstack([data[f] for f in features]))
 	return bands, np.dstack([data[f] for f in features])
 
 def get_tile_geographic_info(file_name, **kwargs):
