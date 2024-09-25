@@ -88,7 +88,7 @@ def impute_data(x_train, y_train, n_neighbors=5):
     return X[:, :n_dim], X[:, n_dim:]
 
 
-def resample_gloria(rrs_data, wvl_in, srf_folder=Path('C:/Users/asaranat/OneDrive - NASA/Code/Rrs_manipulation/Rsr'),
+def resample_Rrs(rrs_data, wvl_in, srf_folder=Path(SRF_FOLDER),
                     sensor="OLCI"):
     """
     This function is designed to resample the hyperspectral measurements available in the Augmented GLORIA dataset to
@@ -260,7 +260,7 @@ def get_gloria_samples(sensor="OLCI", bg_var=['chl', 'tss', 'cdom'],
     #rrs_data = np.asarray(rrs_data, dtype=float)[:, 1:-1]
 
     'Resample the spectral samples in augmented gloria according to the sensor of interest'
-    rrs_resamp, wvl_out = resample_gloria(rrs_data, wvl_in, sensor=sensor, srf_folder=srf_folder)
+    rrs_resamp, wvl_out = resample_Rrs(rrs_data, wvl_in, sensor=sensor, srf_folder=srf_folder)
 
     '------------------------------------------------------------------------------------------------------------------'
     'GET WATER QUALITY INDICATORS DATA'
