@@ -483,7 +483,7 @@ def overlay_rgb_mdnProducts(rgb_img, model_preds, extent, img_uncert=None, produ
 
     'Create the basic figure and set its properties'
     if img_uncert is not None:
-        fig1, (ax1, ax2) = plt.subplots(ncols=2, figsize=figsize)
+        fig1, (ax1, ax2) = plt.subplots(ncols=2, figsize=figsize, sharex=True, sharey=True)
     else:
         fig1, ax1= plt.subplots(figsize=figsize)
 
@@ -495,7 +495,7 @@ def overlay_rgb_mdnProducts(rgb_img, model_preds, extent, img_uncert=None, produ
     img1 = ax1.imshow(rgb_img, extent=extent, aspect=ASPECT, zorder=ord)
     img2 = ax1.imshow(np.ma.masked_where(model_preds <= -5.9, model_preds), cmap=cmap,
                       extent=extent, aspect=ASPECT, zorder=ord + 1)
-    ax1.set_title("Model predictions-" + product_name, fontsize=BIGGER_SIZE, fontweight="bold")
+    ax1.set_title(product_name, fontsize=BIGGER_SIZE, fontweight="bold")
     'Apply colorbar'
     #pred_ticks = np.arange(np.floor(np.min(model_preds[model_preds > -5.9])), np.floor(np.max(model_preds))+1)
     pred_labels = [f'{(10**(i)):.2f}'  for i in pred_ticks]
@@ -505,18 +505,18 @@ def overlay_rgb_mdnProducts(rgb_img, model_preds, extent, img_uncert=None, produ
 
     'Display the results - model uncertainty'
     if img_uncert is not None:
+        img_uncert = np.log10(img_uncert + 1.e-6)
         img3 = ax2.imshow(rgb_img, extent=extent, aspect=ASPECT, zorder=ord)
         'Normalize uncertainty'
-        img4 = ax2.imshow(np.ma.masked_where(img_uncert <= 0, img_uncert), cmap=cmap,
+        img4 = ax2.imshow(np.ma.masked_where(img_uncert <= -5.9, img_uncert), cmap=cmap,
                       extent=extent, aspect=ASPECT, zorder=ord + 1)
         ax2.set_title(r"Total Uncertainty ($\sigma_{UNC}$)", fontsize=BIGGER_SIZE, fontweight="bold")
         img4.set_clim(pred_uncert_ticks[0], pred_uncert_ticks[-1])
-        pred_uncert_labels = [f'{i:2.3f}' for i in pred_uncert_ticks]
+        pred_uncert_labels = [f'{(10**(i)):.2f}' for i in pred_uncert_ticks]   #[f'{i:2.3f}' for i in pred_uncert_ticks]
         colorbar(img4, ticks_list=pred_uncert_ticks, lbl_list=pred_uncert_labels)
 
     if not ipython_mode:
         return fig1
-
 
 if __name__ == "__main__":
     sensor = "OLCI"
