@@ -48,7 +48,7 @@ SENSOR_NAME={
 }
 
 'List variable with currently supported sensors'
-SUPPORTED_SENSORS = ['OLI', 'MSI', 'OLCI', 'S3A', 'S3B', 'HICO', 'PRISMA', 'PACE', 'PACE-sat']
+SUPPORTED_SENSORS = ['OLI', 'MSI', 'OLCI', 'S3A', 'S3B', 'HICO', 'PRISMA', 'PACE', 'PACE-sat','HYPER']
 
 def impute_data(x_train, y_train, n_neighbors=5):
     """
