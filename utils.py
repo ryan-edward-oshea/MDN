@@ -46,7 +46,7 @@ def uncompress(path, overwrite=False):
 				zf.extractall(path)
                 
 def download_example_imagery(sensor, date, location):
-
+	rgb_link = ''
 	if sensor =="HICO" and date=="09-08-2014" and location=="Lake Erie":
 		link = "https://nasagov.box.com/shared/static/0i6b4j9m29ilyip20y8k37kjzorra98k.nc"
 	elif sensor =="OLI" and date=="03-16-2019" and location=="San Francisco Bay":
@@ -61,15 +61,21 @@ def download_example_imagery(sensor, date, location):
 	elif sensor =="OLCI" and date=="03-16-2019" and location=="San Francisco Bay":
 		link = "https://nasagov.box.com/shared/static/klco8ktabzboixnqeghtc9syms7j9q07.nc"
 		rgb_link = "https://nasagov.box.com/shared/static/qcsexizc55g3hxl3ez29pzr01gvrrpcg.png"
+	elif sensor =="PACE" and date=="05-31-2024" and location=="Lake Erie":
+		link = "https://nasagov.box.com/shared/static/sk8bunpkvltneyh3ar4at9d9c4rjr29e.nc"
+	elif sensor =="PACE" and date=="06-12-2024" and location=="Lake Erie":
+		link = "https://nasagov.box.com/shared/static/wq426gu1a3tfae2qa5t3thj74xhj67ij.nc"
+	elif sensor =="PACE" and date=="09-16-2024" and location=="Lake Erie":
+		link = "https://nasagov.box.com/shared/static/5bmlcmrc8fy51610hpdfrhr6g7sg9bwy.nc"
 	else:
 		assert True, f"No images found for {location} from the {sensor} sensor on {date}"
 
 	dest = os.getcwd() + f"/data/example_imagery/{sensor}/{date}/{location}/sat_cube.nc"
-	rgb_dest=  os.getcwd() + f"/data/example_imagery/{sensor}/{date}/{location}/sat_rgb.png"
+	if len(rgb_link): rgb_dest=  os.getcwd() + f"/data/example_imagery/{sensor}/{date}/{location}/sat_rgb.png"
 	if not os.path.isfile(dest):
 		os.makedirs(os.path.dirname(dest),  exist_ok=True)
 		subprocess.run(["curl","-L",link,  "-o",dest])
-		subprocess.run(["curl", "-L", rgb_link, "-o", rgb_dest])
+		if len(rgb_link): subprocess.run(["curl", "-L", rgb_link, "-o", rgb_dest])
         #with zipfile.ZipFile(dest, 'r') as zf:
             #zf.extractall(Path(os.getcwd() + "/example_imagery/"))
 
