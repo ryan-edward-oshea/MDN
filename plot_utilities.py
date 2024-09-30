@@ -17,9 +17,9 @@ import seaborn as sns
 from .utils import get_tile_data, get_tile_geographic_info
 
 'Set display parameters for MATPLOTLIB'
-plt.rcParams.update({
-"font.family": "sans-serif",
-"font.sans-serif": ["Helvetica"]})
+#plt.rcParams.update({
+#"font.family": "sans-serif",
+#"font.sans-serif": ["Helvetica"]})
 plt.rcParams['mathtext.default']='regular'
 SMALL_SIZE = 12
 MEDIUM_SIZE = 14
