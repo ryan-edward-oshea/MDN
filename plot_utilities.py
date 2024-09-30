@@ -18,7 +18,6 @@ from .utils import get_tile_data, get_tile_geographic_info
 
 'Set display parameters for MATPLOTLIB'
 plt.rcParams.update({
-"text.usetex": True,
 "font.family": "sans-serif",
 "font.sans-serif": ["Helvetica"]})
 plt.rcParams['mathtext.default']='regular'
@@ -240,8 +239,8 @@ def create_scatterplots_trueVsPred(y_true, y_pred, short_name=None, x_label=None
         axes[ctr].text(0.75, 0.1, textstr1, transform=axes[ctr].transAxes, fontsize=SMALL_SIZE*1, weight="bold",
                        verticalalignment='top', bbox=props)
 
-        axes[ctr].set_xlabel(x_label[ctr].replace(' ', '\ '), fontsize=MEDIUM_SIZE*1, labelpad=10)
-        axes[ctr].set_ylabel(y_label[ctr].replace(' ', '\ '), fontsize=MEDIUM_SIZE*1, labelpad=10)
+        axes[ctr].set_xlabel(x_label[ctr].replace(' ', '\ ' if plt.rcParams['text.usetex'] else ' '), fontsize=MEDIUM_SIZE*1, labelpad=10)
+        axes[ctr].set_ylabel(y_label[ctr].replace(' ', '\ ' if plt.rcParams['text.usetex'] else ' '), fontsize=MEDIUM_SIZE*1, labelpad=10)
         axes[ctr].set_aspect('equal', 'box')
         axes[ctr].set_title(short_name[ctr])
         axes[ctr].grid()
