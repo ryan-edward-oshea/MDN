@@ -394,7 +394,7 @@ def find_rgb_img_nc(file_name, sensor, rhos=True):
     return img_rgb
 
 
-def display_sat_rgb(file_name, sensor, figsize=(15, 5), title=None, ipython_mode=False, flipud=False):
+def display_sat_rgb(file_name, sensor, figsize=(15, 5), title=None, ipython_mode=False, flipud=False,rhos=True):
     """
     This function can be used extract an RGB image by using the rhos data present in a netCDF file
 
@@ -418,7 +418,7 @@ def display_sat_rgb(file_name, sensor, figsize=(15, 5), title=None, ipython_mode
     'Get the geographic information'
     lon, lat, extent = get_tile_geographic_info(file_name)
     'Get the rgb composite'
-    rgb_img = find_rgb_img_nc(file_name, sensor)
+    rgb_img = find_rgb_img_nc(file_name, sensor,rhos=rhos)
     if flipud: rgb_img = np.flipud(rgb_img)
     
     'Display the results'
