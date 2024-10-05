@@ -340,7 +340,7 @@ def map_cube(img_data, wvl_bands, sensor, products='chl,tss,cdom', land_mask=Fal
     args = get_args(kwargs, use_cmdline=False)
 
     'Compare the model bands to the available bands '
-    sensor_bands = get_sensor_bands(args.sensor)
+    sensor_bands = get_sensor_bands(args.sensor,args=args)
     if any(sensor_bands != wvl_bands):
         valid_bands = []
         for item in sensor_bands:
