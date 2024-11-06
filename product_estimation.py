@@ -199,11 +199,11 @@ def get_estimates(args, x_train=None, y_train=None, x_test=None, y_test=None, ou
     return outputs, model.output_slices
 
 
-def apply_model(x_test, use_cmdline=True, **kwargs):
-    ''' Apply a model (defined by kwargs and default parameters) to x_test '''
-    args = get_args(kwargs, use_cmdline=use_cmdline)
-    preds, idxs = get_estimates(args, x_test=x_test)
-    return np.median(preds, 0), idxs
+def apply_model(x_test, use_cmdline=False, **kwargs):
+	''' Apply a model (defined by kwargs and default parameters) to x_test '''
+	args = get_args(kwargs, use_cmdline=use_cmdline)
+	preds, idxs = get_estimates(args, x_test=x_test)
+	return np.median(preds, 0), idxs
 
 
 def image_estimates(data, sensor=None, function=apply_model, rhos=False, anc=False, **kwargs):

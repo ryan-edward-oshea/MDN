@@ -11,7 +11,93 @@ from tqdm import trange
 import pickle as pkl
 import numpy as np 
 import hashlib, re, warnings, functools, sys, zipfile
+import subprocess, MDN, os
 
+supported_models = {
+	'OLI': ['chl,tss,cdom', 'chl'],
+
+	'OLCI': ['chl,tss,cdom', 'chl'],
+
+	'MSI': ['chl,tss,cdom', 'chl'],
+
+	'S3A': ['chl,tss,cdom,pc'],
+	'S3B': ['chl,tss,cdom,pc'],
+
+	'HICO': ['aph,chl,tss,pc,ad,ag,cdom'],
+
+	'PRISMA': ['aph,chl,tss,pc,ad,ag,cdom'],
+	'PACE': ['aph,chl,tss,pc,ad,ag,cdom'],
+	'PACE-sat': ['aph,chl,tss,pc,ad,ag,cdom'],
+
+}
+
+def current_support():
+	ctr = 1
+	for key in supported_models:
+		for item in supported_models[key]:
+			print(f'Model-{ctr}: predicts {item} from {key} data')
+			ctr+=1
+
+def uncompress(path, overwrite=False):
+	''' Uncompress a .zip archive '''
+	if overwrite or not path.exists():
+		if path.with_suffix('.zip').exists():
+			with zipfile.ZipFile(path.with_suffix('.zip'), 'r') as zf:
+				zf.extractall(path)
+                
+def download_example_imagery(sensor, date, location):
+	rgb_link = ''
+	if sensor =="HICO" and date=="09-08-2014" and location=="Lake Erie":
+		link = "https://nasagov.box.com/shared/static/0i6b4j9m29ilyip20y8k37kjzorra98k.nc"
+	elif sensor =="OLI" and date=="03-16-2019" and location=="San Francisco Bay":
+		link = "https://nasagov.box.com/shared/static/3m9u778rzlnbs0bftm1o2527ctigg4vf.nc"
+		rgb_link = "https://nasagov.box.com/shared/static/iekn2w8tjygvh66o8e1uiwsgq42hipzu.png"
+	elif sensor =="OLCI" and date=="08-29-2016" and location=="Lake Erie":
+		link = "https://nasagov.box.com/shared/static/96yy3e4d89clyaeixpgsj31lcgjbhbx6.nc"
+		rgb_link = "https://nasagov.box.com/shared/static/6e30vvypp0ryy43u3yh2tenh5fy766ac.png"
+	elif sensor =="OLCI" and date=="06-08-2018" and location=="Utah Lake":
+		link = "https://nasagov.box.com/shared/static/ksq9yqgfhu5ae4rffakjdgv6v66tcral.nc"
+		rgb_link = "https://nasagov.box.com/shared/static/zz68knzmjfjkzy7u5hkmrlb7i1y10rv3.png"
+	elif sensor =="OLCI" and date=="03-16-2019" and location=="San Francisco Bay":
+		link = "https://nasagov.box.com/shared/static/klco8ktabzboixnqeghtc9syms7j9q07.nc"
+		rgb_link = "https://nasagov.box.com/shared/static/qcsexizc55g3hxl3ez29pzr01gvrrpcg.png"
+	elif sensor =="PACE" and date=="05-31-2024" and location=="Lake Erie":
+		link = "https://nasagov.box.com/shared/static/sk8bunpkvltneyh3ar4at9d9c4rjr29e.nc"
+	elif sensor =="PACE" and date=="06-12-2024" and location=="Lake Erie":
+		link = "https://nasagov.box.com/shared/static/wq426gu1a3tfae2qa5t3thj74xhj67ij.nc"
+	elif sensor =="PACE" and date=="09-16-2024" and location=="Lake Erie":
+		link = "https://nasagov.box.com/shared/static/5bmlcmrc8fy51610hpdfrhr6g7sg9bwy.nc"
+	else:
+		assert True, f"No images found for {location} from the {sensor} sensor on {date}"
+
+	dest = os.getcwd() + f"/data/example_imagery/{sensor}/{date}/{location}/sat_cube.nc"
+	if len(rgb_link): rgb_dest=  os.getcwd() + f"/data/example_imagery/{sensor}/{date}/{location}/sat_rgb.png"
+	if not os.path.isfile(dest):
+		os.makedirs(os.path.dirname(dest),  exist_ok=True)
+		subprocess.run(["curl","-L",link,  "-o",dest])
+		if len(rgb_link): subprocess.run(["curl", "-L", rgb_link, "-o", rgb_dest])
+        #with zipfile.ZipFile(dest, 'r') as zf:
+            #zf.extractall(Path(os.getcwd() + "/example_imagery/"))
+
+	return dest
+            
+def download_weights(model_path_name):
+    
+    MDN_folder  = os.path.dirname(MDN.__file__) + '/Weights/'
+    
+    downloadable_weights = {
+     '6041caec3d8c34771f9082740fc3cee1a16d3b1b21cfda0f245e615a0a01570d' : ["PRISMA",MDN_folder + 'PRISMA/6041caec3d8c34771f9082740fc3cee1a16d3b1b21cfda0f245e615a0a01570d.zip',"https://nasagov.box.com/shared/static/6m6hk18cpln772dgsbm6hl2scigmjebz.zip"],
+     'b978ee38b759569c6c6860a6a875f23131cef5ecf5b93d0d67708cb408718c85' : ["HICO",  MDN_folder + 'HICO/b978ee38b759569c6c6860a6a875f23131cef5ecf5b93d0d67708cb408718c85.zip',  "https://nasagov.box.com/shared/static/c0ginufcrujc8v7yr5mk7j4komoog00p.zip"],
+     '6643ade4f109db3d9e0dc8d5bbae613441cd7ed95863320040688ab2e4afe0d8' : ["PACE",  MDN_folder + 'PACE/6643ade4f109db3d9e0dc8d5bbae613441cd7ed95863320040688ab2e4afe0d8.zip',  "https://nasagov.box.com/shared/static/aatfzwn0e2ezdrizib38skett6tawred.zip"],
+     'd3ebd0b61b79f3fc1dc8fe8c83cb144fca54ad4a93e951cd3cddd728625b7733' : ["PACE",  MDN_folder + 'PACE/d3ebd0b61b79f3fc1dc8fe8c83cb144fca54ad4a93e951cd3cddd728625b7733.zip',  "https://nasagov.box.com/shared/static/81pa0tv6uklxt1vko3jt7l1mgmpmgraz.zip"],
+     }
+
+    if  model_path_name in downloadable_weights.keys(): 
+        sensor,dest,link = downloadable_weights[model_path_name]
+        if not os.path.isfile(dest):
+            os.makedirs(os.path.dirname(dest),  exist_ok=True)
+            print("Downloading model weights...")
+            subprocess.run(["curl","-L",link,  "-o",dest])
 
 def ignore_warnings(func):
     ''' Decorator to silence all warnings (Runtime, User, Deprecation, etc.) '''
@@ -100,12 +186,6 @@ def compress(path, overwrite=False):
                 zf.write(item, item.relative_to(path))
 
 
-def uncompress(path, overwrite=False):
-    ''' Uncompress a .zip archive '''
-    if overwrite or not path.exists():
-        if path.with_suffix('.zip').exists():
-            with zipfile.ZipFile(path.with_suffix('.zip'), 'r') as zf:
-                zf.extractall(path)
 
 
 class CustomUnpickler(pkl.Unpickler):
@@ -248,56 +328,78 @@ def _get_tile_wavelengths(nc_data, key, sensor, allow_neg=True, landmask=False, 
         return bands, data.filled(fill_value=np.nan)
     return [], np.array([])
 
-def get_tile_data(filenames, sensor, allow_neg=True, rhos=False, anc=False, **kwargs):
-    ''' Gather the correct Rrs/rhos bands from a given scene, as well as ancillary features if necessary '''
-    from netCDF4 import Dataset
+def get_tile_data(filenames, sensor, allow_neg=True, rhos=False, anc=False,landmask=False,flipud=False, **kwargs):
+	''' Gather the correct Rrs/rhos bands from a given scene, as well as ancillary features if necessary '''
+	from netCDF4 import Dataset
 
-    filenames = np.atleast_1d(filenames) 
-    features  = ['rhos' if rhos else 'Rrs'] + (ANCILLARY if anc or rhos else [])
-    data      = {}
-    available = []
+	filenames = np.atleast_1d(filenames) 
+	features  = ['rhos' if rhos else 'Rrs'] + (ANCILLARY if anc and rhos else [])
+	data      = {}
+	available = []
 
     # Some sensors use different bands for their rhos models 
     if rhos and '-rho' not in sensor: sensor += '-rho'
 
-    args = get_args(sensor=sensor, **kwargs)
-    for filename in filenames:
-        with Dataset(filename, 'r') as nc_data:
-            if 'geophysical_data' in nc_data.groups.keys():
-                nc_data = nc_data['geophysical_data']
-    
-            for feature in features:
-                if feature not in data:
-                    if feature in ['Rrs', 'rhos']:
-                        bands, band_data = _get_tile_wavelengths(nc_data, feature, sensor, allow_neg, landmask=rhos, args=args)
-    
-                        if len(bands) > 0: 
-                            assert(len(band_data.shape) == 3), \
-                                f'Different shape than expected: {band_data.shape}'
-                            data[feature] = band_data
-    
-                    elif feature in nc_data.variables:
-                        var = nc_data[feature][:]
-                        assert(len(var.shape) == 2), f'Different shape than expected: {var.shape}'
-    
-                        if feature in PERIODIC:
-                            assert(var.min() >= -180 and var.max() <= 180), \
-                                f'Need to adjust transformation for variables not within [-180,180]: {feature}=[{var.min()}, {var.max()}]'
-                            data[feature] = np.stack([
-                                np.sin(2*np.pi*(var+180)/360),
-                                np.cos(2*np.pi*(var+180)/360),
-                            ], axis=-1)
-                        else: data[feature] = var
-    
-    # Time difference should just be 0: we want estimates for the exact time of overpass
-    if 'time_diff' in features:
-        assert(features[0] in data), f'Missing {features[0]} data: {list(data.keys())}'
-        data['time_diff'] = np.zeros_like(data[features[0]][:, :, 0])
+	args = get_args(sensor=sensor, **kwargs)
+	for filename in filenames:
+		with Dataset(filename, 'r') as nc_data:
+			if 'geophysical_data' in nc_data.groups.keys():
+				nc_data = nc_data['geophysical_data']
+	
+			for feature in features:
+				if feature not in data:
+					if feature in ['Rrs', 'rhos']:
+						bands, band_data = _get_tile_wavelengths(nc_data, feature, sensor, allow_neg, landmask=landmask, args=args)
+	
+						if len(bands) > 0: 
+							assert(len(band_data.shape) == 3), \
+								f'Different shape than expected: {band_data.shape}'
+							data[feature] = band_data
+	
+					elif feature in nc_data.variables:
+						var = nc_data[feature][:]
+						assert(len(var.shape) == 2), f'Different shape than expected: {var.shape}'
+	
+						if feature in PERIODIC:
+							assert(var.min() >= -180 and var.max() <= 180), \
+								f'Need to adjust transformation for variables not within [-180,180]: {feature}=[{var.min()}, {var.max()}]'
+							data[feature] = np.stack([
+								np.sin(2*np.pi*(var+180)/360),
+								np.cos(2*np.pi*(var+180)/360),
+							], axis=-1)
+						else: data[feature] = var
+	
+	# Time difference should just be 0: we want estimates for the exact time of overpass
+	if 'time_diff' in features:
+		assert(features[0] in data), f'Missing {features[0]} data: {list(data.keys())}'
+		data['time_diff'] = np.zeros_like(data[features[0]][:, :, 0])
 
-    assert(len(data) == len(features)), f'Missing features: Found {list(data.keys())}, Expecting {features}'
-    return bands, np.dstack([data[f] for f in features])
+	assert(len(data) == len(features)), f'Missing features: Found {list(data.keys())}, Expecting {features}'
+	if flipud: return bands, np.flipud(np.dstack([data[f] for f in features]))
+	return bands, np.dstack([data[f] for f in features])
 
+def get_tile_geographic_info(file_name, **kwargs):
+	from netCDF4 import Dataset
 
+	with Dataset(file_name, 'r') as nc_data:
+		if 'navigation_data' in nc_data.groups.keys():
+			nc_data = nc_data['navigation_data']
+
+		lon_k, lat_k = ('lon', 'lat') if 'lon' in nc_data.variables.keys() else ('longitude', 'latitude')
+		lon, lat = nc_data.variables[lon_k][:], nc_data.variables[lat_k][:]
+
+		if len(lon.shape) == 1:
+			lon, lat = np.meshgrid(lon, lat)
+
+	lon[lon < -180] = np.nan
+	lat[lat < -180] = np.nan
+
+	lon.mask = False
+	lat.mask = False
+
+	extent = np.nanmin(lon), np.nanmax(lon), np.nanmin(lat), np.nanmax(lat)
+	return lon, lat, extent
+	
 def generate_config(args, create=True, verbose=True):
     ''' 
     Create a config file for the current settings, and store in
@@ -314,9 +416,10 @@ def generate_config(args, create=True, verbose=True):
         if args.verbose: print(f'Using manually set model uid: {args.model_uid}')
         return root.joinpath(args.model_uid)
 
-    # Hash is always dependent upon these values
-    dependents = [getattr(act, 'dest', '') for group in [hypers, update] for act in group._group_actions]
-    dependents+= ['x_scalers', 'y_scalers']
+	# Hash is always dependent upon these values
+	dependents = [getattr(act, 'dest', '') for group in [hypers, update] for act in group._group_actions]
+	dependents+= ['x_scalers', 'y_scalers']
+	if args.sensor in ['PRISMA','HICO','PACE'] and args.product=='aph,chl,tss,pc,ad,ag,cdom': dependents+= ['allow_missing','allow_nan_inp','allow_nan_out','filter_ad_ag','min_in_out_val','removed_dataset']
 
     # Hash is only partially dependent upon these values, assuming operation changes when using a feature
     #  - 'use_' flags being set cause dependency
@@ -340,17 +443,19 @@ def generate_config(args, create=True, verbose=True):
         elif k in dependents:    config.append(f'{k:<18}: {v}')
         else:                    others.append(f'{k:<18}: {v}') 
 
-    config = '\n'.join(config) # Model is dependent on some arguments, so they change the uid
-    others = '\n'.join(others) # Other arguments are stored for replicability
-    ver_re = r'(Version\: \d+\.\d+)(?:\.\d+\n)' # Match major/minor version within subgroup, patch/dashes within pattern
-    h_str  = re.sub(ver_re, r'\1.0\n', config)  # Substitute patch version for ".0" to allow patches within the same uid
-    uid    = hashlib.sha256(h_str.encode('utf-8')).hexdigest()
-    folder = root.joinpath(uid)
-    c_file = folder.joinpath('config')
-    uncompress(folder) # Unzip the archive if necessary
-    
-    if args.verbose: 
-        print(f'Using model path {folder}')
+	config = '\n'.join(config) # Model is dependent on some arguments, so they change the uid
+	others = '\n'.join(others) # Other arguments are stored for replicability
+	ver_re = r'(Version\: \d+\.\d+)(?:\.\d+\n)' # Match major/minor version within subgroup, patch/dashes within pattern
+	h_str  = re.sub(ver_re, r'\1.0\n', config)  # Substitute patch version for ".0" to allow patches within the same uid
+	uid    = hashlib.sha256(h_str.encode('utf-8')).hexdigest()
+	folder = root.joinpath(uid)
+	c_file = folder.joinpath('config')
+	download_weights(folder.stem)
+	try: uncompress(folder) # Unzip the archive if necessary
+	except: raise Exception('Weights have not yet been downloaded - please run "git lfs install" and then "git lfs pull" inside the repository folder')
+	
+	if args.verbose: 
+		print(f'Using model path {folder}')
 
     if create:
         folder.mkdir(parents=True, exist_ok=True)
@@ -708,14 +813,13 @@ def get_data(args):
         data_path   = Path(args.data_loc)
         get_dataset = lambda path, p: Path(path.as_posix().replace(f'/{sensor}','').replace(f'/{p}.csv','')).stem
 
-        for product in products:
-            if product in ['chl', 'tss', 'cdom','secchi', 'pc','Fuco','Peri','waterTemperature','salinity','turbidity','spim','spom','depth','conductivity','microcystin','Scdom443','Snap443','nap','latlon','dataset']:
-                product = f'../{product}'
-            if product in ['bbp']:
-                product = f'../MULT/{product}'
-            # Find all datasets with the given product available
-            safe_prod = product.replace('*', '[*]') # Prevent glob from getting confused by wildcard
-            datasets  = [get_dataset(path, product) for path in data_path.glob(f'*/{sensor}/{safe_prod}.csv')]
+		for product in products:
+			if product in ['chl', 'tss', 'cdom','pc']:
+				product = f'../{product}'
+		
+			# Find all datasets with the given product available
+			safe_prod = product.replace('*', '[*]') # Prevent glob from getting confused by wildcard
+			datasets  = [get_dataset(path, product) for path in data_path.glob(f'*/{sensor}/{safe_prod}.csv')]
 
 #            if product == 'aph':PACE data may be slightly off.
             if args.removed_dataset is not None : datasets = [d for d in datasets if  d not in args.removed_dataset.split(',')]

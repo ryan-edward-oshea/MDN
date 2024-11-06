@@ -26,10 +26,10 @@ class RatioTransformer(_CustomTransformer):
     def _fit(self, X, *args, **kwargs):
         self.shape = X.shape[1]
 
-    def _transform(self, X, *args, **kwargs):         
-        ''' Ratios based on literature '''
-        from ..benchmarks.utils import get_required, has_band, closest_wavelength
-        self.labels = []
+	def _transform(self, X, *args, **kwargs):		 
+		''' Ratios based on literature '''
+		from ..benchmarks.utils import get_required, has_band, closest_wavelength
+		self.labels = []
 
         x     = np.atleast_2d(X)
         x_new = []
