@@ -339,6 +339,22 @@ def find_rgb_img(img, wvl_bands, PRISMA_mode=False):
     return img_rgb
 
 
+def identify_RGB_data(filename,verbose=False):
+	''' Return the Rrs/rhos data within the netcdf file, for wavelengths of the given sensor '''
+	from netCDF4 import Dataset
+
+	with Dataset(filename, 'r') as nc_data:
+		if 'geophysical_data' in nc_data.groups.keys():
+			nc_data = nc_data['geophysical_data']
+		for key in ['rhos', 'rayleigh_corrected','Rrs']:
+			has_key = lambda k: any([k in v for v in nc_data.variables])
+			wvl_key = f'{key}_' if has_key(f'{key}_') or key != 'Rrs' else 'Rw' # Polymer stores Rw=Rrs*pi
+			if has_key(wvl_key): 
+				if verbose: print(key,wvl_key,nc_data.variables.keys())
+				return key
+            
+    
+    
 def find_rgb_img_nc(file_name, sensor, rhos=True):
     """
     This function can be used extract the RB composite from a NetCDF file
@@ -356,7 +372,7 @@ def find_rgb_img_nc(file_name, sensor, rhos=True):
     """
     'Get the image data and an RGB composite of the scene'
     if "L1B" not in str(file_name):
-        wvl_bands, img = get_tile_data(file_name, sensor, rhos=rhos)
+        wvl_bands, img = get_tile_data(file_name, sensor, key_in=identify_RGB_data(file_name))
         wvl_bands = np.asarray(wvl_bands)
     else:
         import netCDF4

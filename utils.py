@@ -327,12 +327,13 @@ def _get_tile_wavelengths(nc_data, key, sensor, allow_neg=True, landmask=False, 
 		return bands, data.filled(fill_value=np.nan)
 	return [], np.array([])
 
-def get_tile_data(filenames, sensor, allow_neg=True, rhos=False, anc=False,landmask=False,flipud=False, **kwargs):
+def get_tile_data(filenames, sensor, allow_neg=True, key_in='Rrs', anc=False,landmask=False,flipud=False, **kwargs):
 	''' Gather the correct Rrs/rhos bands from a given scene, as well as ancillary features if necessary '''
 	from netCDF4 import Dataset
 
+	rhos = True if key_in == 'rhos' else False
 	filenames = np.atleast_1d(filenames) 
-	features  = ['rhos' if rhos else 'Rrs'] + (ANCILLARY if anc and rhos else [])
+	features  = [key_in] + (ANCILLARY if anc and rhos else [])
 	data      = {}
 	available = []
 
@@ -347,7 +348,7 @@ def get_tile_data(filenames, sensor, allow_neg=True, rhos=False, anc=False,landm
 	
 			for feature in features:
 				if feature not in data:
-					if feature in ['Rrs', 'rhos']:
+					if feature in ['Rrs', 'rhos', 'rayleigh_corrected']:
 						bands, band_data = _get_tile_wavelengths(nc_data, feature, sensor, allow_neg, landmask=landmask, args=args)
 	
 						if len(bands) > 0: 
