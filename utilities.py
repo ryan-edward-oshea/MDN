@@ -229,7 +229,7 @@ def get_mdn_uncert_ensemble(ensmeble_distribution, estimates, scaler_y_list, sca
     else:
         return np.asarray(final_uncertainties)
 
-def map_cube(img_data, wvl_bands, sensor, products='chl,tss,cdom', land_mask=False, landmask_threshold=0.0,
+def map_cube_old(img_data, wvl_bands, sensor, products='chl,tss,cdom', land_mask=False, landmask_threshold=0.0,
              flg_subsmpl=False, subsmpl_rate=10, flg_uncert=False, slices=None, scaler_mode="invert",
              block_size=10000):
     """
@@ -340,15 +340,13 @@ def map_cube(img_data, wvl_bands, sensor, products='chl,tss,cdom', land_mask=Fal
     args = get_args(kwargs, use_cmdline=False)
 
     'Compare the model bands to the available bands '
-    sensor_bands = get_sensor_bands(args.sensor,args=args)
+    sensor_bands = get_sensor_bands(args.sensor)
     if any(sensor_bands != wvl_bands):
         valid_bands = []
         for item in sensor_bands:
             assert np.min(np.abs(np.asarray(wvl_bands) - item))<=5, f"The bands provided-{wvl_bands} do not " \
                                                                        f"agree with the sensor bands {sensor_bands}"
             valid_bands += [np.argmin(np.abs(np.asarray(wvl_bands) - item))]
-    else:
-        valid_bands = ~np.isnan(wvl_bands)
 
     'Only selecting the valid bands for this model'
     wvl_bands = np.asarray(wvl_bands)[valid_bands]
@@ -435,3 +433,262 @@ def map_cube(img_data, wvl_bands, sensor, products='chl,tss,cdom', land_mask=Fal
 
     return model_preds, img_uncert, op_slices
 
+
+def map_cube(img_data, wvl_bands, sensor, products='chl,tss,cdom', land_mask=False, landmask_threshold=0.0,
+             flg_subsmpl=False, subsmpl_rate=10, flg_uncert=False, slices=None, scaler_mode="invert",
+             block_size=100000, uncert_mode="composite"):
+    """
+    This function is used tomap the pixels in a 3D numpy array, in terms of both parameters and the associated
+    model uncertainty.
+
+    :param img_data: [np.ndarray: nRow X nCols X nBands]
+    The 3D array for which we need MDN predictions
+
+    :param wvl_bands: [np.ndarray: nBands]
+    The bands associated with the 3rd dimension of img_data
+
+    :param sensor:
+    The sensor for which we are creating the image maps.
+
+    :param products: [str] (Default:"chl,tss,cdom")
+    The products we want to estimate using this model.
+
+    :param land_mask: [Bool] (default: False)
+    Should a heuristic be applied to mask out the land pixels
+
+    :param landmask_threshold: [-1 <= float <= 1] (default: 0.2)
+    The value with which the land mask is being calculated.
+
+    :param flg_subsmpl: [bool] (Default: False)
+    Does the image have to be subsampled.
+
+    :param subsmpl_rate: [int > 0] (Default: 10)
+    The subsampling rate. Must be an integer. For e.g. if provided rate is 2, one pixel is chosen in each 2X2
+    spatial bin.
+
+    :param flg_uncert: [bool] (Default: False)
+    Does uncertainty have to be estimated
+
+    :param slices: [dict](Default: None)
+    The indicies of the MDN outputs
+
+    :param scaler_modes: [str in ['invert', 'non_invert']] (Default: 'non_invert')
+    Is the uncertainty inverted using the MDN's intrinsic scaler
+
+    :param block_size: [int] (Default: 10000)
+    The size of the spectral block that is being processed for at once
+
+    :param uncert_modes: [str in ['bound', 'composite']] (Default: 'bound')
+    Due to the use of a non-linear output scaler, the uncertainty metric is imbalanced in the original parameter space.
+    As such we provide two modes of uncertianty (i) 'bound': This option just provides as output both the upper
+    (inv_scl(est + unc)) and lower bounds (inv_scl(est + unc)). (ii)'composite': In this mode the uncertainty is
+    provided as [0.5{inv_scl(est + unc) - inv_scl(est - unc)}] which will provide the average uncertainty in the
+    parameter space.
+
+    :return:
+    model_preds: [np.ndarray]
+    A prediction for each valid sample in the input image
+
+    img_uncert: [np.ndarray] (OPTIONAL)
+    Only generated when flg_ucncert is true. Encapsulates the prediction uncertainty for each sample for each output.
+
+    op_slices: [dictionary]
+    The output slices of the various products.
+    """
+
+    assert isinstance(img_data, np.ndarray), "The <image_data> variable must be a numpy array"
+    assert len(img_data.shape) == 3, "The <image_data> variable must be a 3D numpy array"
+    assert isinstance(land_mask, bool), "The <mask_land> parameter must be a boolean variable"
+    assert isinstance(landmask_threshold, float) and (np.abs(landmask_threshold) <= 1), "The <landmask_threshold>" \
+                                                                                        "must be in range [-1, 1]"
+    assert isinstance(flg_subsmpl, bool), f"The variable <flg_subsmpl> must be boolean"
+    if flg_subsmpl:
+        assert isinstance(subsmpl_rate, int) and (subsmpl_rate > 0), f"The variable <subsmpl_rate> must be a " \
+                                                                     f"positive integer"
+
+    assert uncert_mode in ["bound", "composite"], f"Only two available options for <scaler_mode> are 'bound' and" \
+                                                    f"'composite'. Instead got '{uncert_mode}'"
+
+    'Get/set the default arguments for the MDN for mapping'
+    kwargs = {'product': products,
+              'sat_bands': True if products == 'chl,tss,cdom,pc' else False,
+              'sensor': sensor}
+
+    if sensor == 'PRISMA' or sensor == 'HICO' or sensor == 'PACE' and products == 'aph,chl,tss,pc,ad,ag,cdom':
+        min_in_out_val = 1e-6
+        kwargs = {
+            'allow_missing': False,
+            'allow_nan_inp': False,
+            'allow_nan_out': True,
+
+            'sensor': sensor,
+            'removed_dataset': "South_Africa,Trasimeno" if sensor == "PRISMA" else "South_Africa",
+            'filter_ad_ag': False,
+            'imputations': 5,
+            'no_bagging': False,
+            'plot_loss': False,
+            'benchmark': False,
+            'sat_bands': False,
+            'n_iter': 31622,
+            'n_mix': 5,
+            'n_hidden': 446,
+            'n_layers': 5,
+            'lr': 1e-3,
+            'l2': 1e-3,
+            'epsilon': 1e-3,
+            'batch': 128,
+            'use_HICO_aph': True,
+            'n_rounds': 10,
+            'product': 'aph,chl,tss,pc,ad,ag,cdom',
+            'use_gpu': False,
+            'data_loc': "/home/ryanoshea/in_situ_database/Working_in_situ_dataset/Augmented_Gloria_V3_2/",
+            'use_ratio': True,
+            'min_in_out_val': min_in_out_val,
+
+        }
+
+        specified_args_wavelengths = {
+            'aph_wavelengths': get_sensor_bands(kwargs['sensor'] + '-aph'),
+            'adag_wavelengths': get_sensor_bands(kwargs['sensor'] + '-adag'),
+        }
+
+    'Update MDN argument dictionary'
+    args = get_args(kwargs, use_cmdline=False)
+
+    'Compare the model bands to the available bands '
+    sensor_bands = get_sensor_bands(args.sensor)
+    if any(sensor_bands != wvl_bands):
+        valid_bands = []
+        for item in sensor_bands:
+            assert np.min(np.abs(np.asarray(wvl_bands) - item))<=5, f"The bands provided-{wvl_bands} do not " \
+                                                                       f"agree with the sensor bands {sensor_bands}"
+            valid_bands += [np.argmin(np.abs(np.asarray(wvl_bands) - item))]
+
+    'Only selecting the valid bands for this model'
+    wvl_bands = np.asarray(wvl_bands)[valid_bands]
+    img_data = img_data[:, :, valid_bands]
+
+    'Sub-sample the image if needed'
+    if flg_subsmpl:
+        img_data = img_data[::subsmpl_rate, ::subsmpl_rate, :]
+
+    'Apply the mask to find and remove the Land pixels or just remove nan values'
+    if land_mask:
+        'Get the mask which mask out the land pixels'
+        # wvl_bands_m, img_data_m = get_tile_data(image_name, 'OLCI-no760', rhos=rhos_flag)
+        img_mask = mask_land(img_data, wvl_bands, threshold=landmask_threshold)
+
+        'Get the locations/spectra for the water pixels'
+        water_pixels = np.where(img_mask == 0)
+        water_spectra = img_data[water_pixels[0], water_pixels[1], :]
+    else:
+        'Get a simple mask removing pixels with Nan values'
+        img_mask = np.asarray((np.isnan(np.min(img_data, axis=2))), dtype=np.float)
+
+        'Get the locations/spectra for the water pixels'
+        water_pixels = np.where(img_mask == 0)
+        water_spectra = img_data[water_pixels[0], water_pixels[1], :]
+
+    'Mask out the spectra with invalid pixels'
+    if water_spectra.size != 0:
+        water_spectra = np.expand_dims(water_spectra, axis=1)
+        water_final = np.ma.masked_invalid(water_spectra.reshape((-1, water_spectra.shape[-1])))
+        water_mask = np.any(water_final.mask, axis=1)
+        water_final = water_final[~water_mask]
+        # water_pixels = water_pixels[~water_mask]
+
+        'Get the estimates and predictions for each sample'
+        final_estimates = np.asarray([])
+        final_uncertainties = np.asarray([])
+
+        for ctr in range((water_final.shape[0] // block_size) + 1):
+            'Get the data in the block'
+            temp = water_final[(ctr * block_size):min((ctr + 1) * block_size, water_final.shape[0])]
+
+            outputs, op_slices = get_mdn_preds(temp, args=args, mode="full")
+            estimates = np.asarray(outputs['estimates'])
+            if final_estimates.size == 0:
+                final_estimates = np.median(estimates, axis=0)
+            else:
+                final_estimates = np.vstack((final_estimates, np.median(estimates, axis=0)))
+
+            final_estimates = np.asarray(final_estimates)
+
+            if flg_uncert:
+                'Perform the Uncertainity estimation'
+                ensmeble_uncertainties = get_mdn_uncert_ensemble(ensmeble_distribution=outputs['coefs'],
+                                                                 estimates=estimates,
+                                                                 scaler_y_list=outputs['scalery'],
+                                                                 scaler_mode="non_invert")
+
+                'If it is the first block initalize the variable else stack with existing variable'
+                if final_uncertainties.size == 0:
+                    final_uncertainties = ensmeble_uncertainties
+                else:
+                    final_uncertainties = np.vstack((final_uncertainties, ensmeble_uncertainties))
+
+                final_uncertainties = np.asarray(final_uncertainties)
+
+        'Create the parameter prediction map'
+        model_preds = np.zeros((img_data.shape[0], img_data.shape[1], final_estimates.shape[-1]))
+        model_preds[water_pixels[0][~water_mask], water_pixels[1][~water_mask], :] = np.asarray(final_estimates)
+
+        'If uncertainties are not needed return output'
+        if not flg_uncert:
+            return model_preds, op_slices
+
+        'If uncertainties are needed but does not need inversion'
+        if scaler_mode != "invert":
+            'Create the uncertainty into an image'
+            img_uncert = np.zeros((img_data.shape[0], img_data.shape[1], final_estimates.shape[-1]))
+            img_uncert[water_pixels[0][~water_mask], water_pixels[1][~water_mask],] = \
+                np.squeeze(np.asarray(final_uncertainties))
+
+            return model_preds, img_uncert, op_slices
+
+        'If inversion is needed -- first find the upper and lower bounds of each estimate space using the '
+        scaler_y = outputs['scalery'][0]
+        upper_uncert = scaler_y.inverse_transform(np.asarray(scaler_y.transform(final_estimates)) + np.asarray(final_uncertainties))
+        lower_uncert = scaler_y.inverse_transform(np.asarray(scaler_y.transform(final_estimates)) - np.asarray(final_uncertainties))
+
+        if uncert_mode == "bound":
+            'Define the upper bound images'
+            img_upper_uncert = np.zeros((img_data.shape[0], img_data.shape[1], final_estimates.shape[-1]))
+            img_upper_uncert[water_pixels[0][~water_mask], water_pixels[1][~water_mask],] = \
+                np.squeeze(np.asarray(upper_uncert))
+
+            'Define the lower bound images'
+            img_lower_uncert = np.zeros((img_data.shape[0], img_data.shape[1], final_estimates.shape[-1]))
+            img_lower_uncert[water_pixels[0][~water_mask], water_pixels[1][~water_mask],] = \
+                np.squeeze(np.asarray(lower_uncert))
+
+            return model_preds, img_lower_uncert, img_upper_uncert, op_slices
+
+        'Instead if we need composite uncertainties'
+        composite_uncert = 0.5 * (upper_uncert - lower_uncert)
+        'Define the upper bound images'
+        img_uncert = np.zeros((img_data.shape[0], img_data.shape[1], final_estimates.shape[-1]))
+        img_uncert[water_pixels[0][~water_mask], water_pixels[1][~water_mask],] = \
+            np.squeeze(np.asarray(composite_uncert))
+
+        return model_preds, img_uncert, op_slices
+
+
+
+
+
+
+
+
+
+
+
+
+    else:
+        if not flg_uncert:
+            return np.zeros((img_data.shape[:-1]))
+
+        model_preds = np.zeros((img_data.shape[:-1]))
+        img_uncert = np.zeros((img_data.shape[:-1]))
+
+    return model_preds, img_uncert, op_slices
