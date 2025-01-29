@@ -556,13 +556,15 @@ def map_cube(img_data, wvl_bands, sensor, products='chl,tss,cdom', land_mask=Fal
     args = get_args(kwargs, use_cmdline=False)
 
     'Compare the model bands to the available bands '
-    sensor_bands = get_sensor_bands(args.sensor)
+    sensor_bands = get_sensor_bands(args.sensor,args=args)
     if any(sensor_bands != wvl_bands):
         valid_bands = []
         for item in sensor_bands:
             assert np.min(np.abs(np.asarray(wvl_bands) - item))<=5, f"The bands provided-{wvl_bands} do not " \
                                                                        f"agree with the sensor bands {sensor_bands}"
             valid_bands += [np.argmin(np.abs(np.asarray(wvl_bands) - item))]
+    else:
+        valid_bands = ~np.isnan(wvl_bands)
 
     'Only selecting the valid bands for this model'
     wvl_bands = np.asarray(wvl_bands)[valid_bands]
