@@ -455,7 +455,7 @@ def display_sat_rgb(file_name, sensor, figsize=(15, 5), title=None, ipython_mode
 
 def overlay_rgb_mdnProducts(rgb_img, model_preds, extent, img_uncert=None, product_name='Parameter',
                             figsize=(15, 5), pred_ticks= [-1, 0, 1, 2], pred_uncert_ticks = [-1, 0, 1, 2],
-                            ipython_mode=False):
+                            ipython_mode=False, img_uncert_lower=None,img_uncert_upper=None,):
     """
     This function can be used to overlay the MDN-prediction maps over the RGB compostite of a satellite image for display
 
@@ -470,6 +470,12 @@ def overlay_rgb_mdnProducts(rgb_img, model_preds, extent, img_uncert=None, produ
 
     :param img_uncert:  [np.ndarray, rows X cols]
     The uncertainty associated with the MDN predictions for that location
+
+    :param img_uncert_lower:  [np.ndarray, rows X cols]
+    The lower bound for uncertainty associated with the MDN predictions for that location
+    
+    :param img_uncert_upper:  [np.ndarray, rows X cols]
+    The upper bound for uncertainty associated with the MDN predictions for that location
 
     :param product_name: (string) (Default: "Parameter")
     The name of the product that has been predicted
@@ -496,10 +502,24 @@ def overlay_rgb_mdnProducts(rgb_img, model_preds, extent, img_uncert=None, produ
             assert model_preds.shape[2] == 1, "This function is only set up to the overlay the predictions of a single " \
                                               "parameter at a time"
 
+    if img_uncert_lower is not None:
+        assert rgb_img.shape[:2] == img_uncert_lower.shape[
+                                    :2], f"The base RGB and uncertainty image should have the same spatial dimensions"
+        if len(img_uncert_lower.shape) > 2:
+            assert model_preds.shape[2] == 1, "This function is only set up to the overlay the predictions of a single " \
+                                              "parameter at a time"
+    if img_uncert_upper is not None:
+        assert rgb_img.shape[:2] == img_uncert_upper.shape[
+                                    :2], f"The base RGB and uncertainty image should have the same spatial dimensions"
+        if len(img_uncert_upper.shape) > 2:
+            assert model_preds.shape[2] == 1, "This function is only set up to the overlay the predictions of a single " \
+                                              "parameter at a time"
 
     'Create the basic figure and set its properties'
     if img_uncert is not None:
         fig1, (ax1, ax2) = plt.subplots(ncols=2, figsize=figsize, sharex=True, sharey=True)
+    elif img_uncert_upper is not None and img_uncert_lower is not None: 
+        fig1, (ax1, ax2, ax3) = plt.subplots(ncols=3, figsize=figsize, sharex=True, sharey=True)
     else:
         fig1, ax1= plt.subplots(figsize=figsize)
 
@@ -531,6 +551,29 @@ def overlay_rgb_mdnProducts(rgb_img, model_preds, extent, img_uncert=None, produ
         pred_uncert_labels = [f'{(10**(i)):.2f}' for i in pred_uncert_ticks]   #[f'{i:2.3f}' for i in pred_uncert_ticks]
         colorbar(img4, ticks_list=pred_uncert_ticks, lbl_list=pred_uncert_labels)
 
+    if img_uncert_upper is not None and img_uncert_lower is not None:
+    	img_uncert_lower = np.log10(img_uncert_lower + 1.e-6)
+    	img_uncert_lower_1 = ax2.imshow(rgb_img, extent=extent, aspect=ASPECT, zorder=ord)
+    	'Normalize uncertainty'
+    	img_uncert_lower_2 = ax2.imshow(np.ma.masked_where(img_uncert_lower <= -5.9, img_uncert_lower), cmap=cmap,
+                      extent=extent, aspect=ASPECT, zorder=ord + 1)
+    	ax2.set_title(r"Lower Bound ($\sigma_{UNC}$)", fontsize=BIGGER_SIZE, fontweight="bold")
+    	img_uncert_lower_2.set_clim(pred_uncert_ticks[0], pred_uncert_ticks[-1])
+    	pred_uncert_labels = [f'{(10**(i)):.2f}' for i in pred_uncert_ticks]   #[f'{i:2.3f}' for i in pred_uncert_ticks]
+    	colorbar(img_uncert_lower_2, ticks_list=pred_uncert_ticks, lbl_list=pred_uncert_labels)
+    	
+    	img_uncert_upper = np.log10(img_uncert_upper + 1.e-6)
+    	img_uncert_upper_1 = ax3.imshow(rgb_img, extent=extent, aspect=ASPECT, zorder=ord)  	
+    	'Normalize uncertainty'
+    	img_uncert_upper_2 = ax3.imshow(np.ma.masked_where(img_uncert_upper <= -5.9, img_uncert_upper), cmap=cmap,
+                      extent=extent, aspect=ASPECT, zorder=ord + 1)
+    	ax3.set_title(r"Upper Bound ($\sigma_{UNC}$)", fontsize=BIGGER_SIZE, fontweight="bold")
+    	img_uncert_upper_2.set_clim(pred_uncert_ticks[0], pred_uncert_ticks[-1])
+    	pred_uncert_labels = [f'{(10**(i)):.2f}' for i in pred_uncert_ticks]   #[f'{i:2.3f}' for i in pred_uncert_ticks]
+    	colorbar(img_uncert_upper_2, ticks_list=pred_uncert_ticks, lbl_list=pred_uncert_labels)
+    	
+    	
+    	
     if not ipython_mode:
         return fig1
 
