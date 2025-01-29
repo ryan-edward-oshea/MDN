@@ -371,7 +371,7 @@ def find_rgb_img_nc(file_name, sensor, rhos=True, auto_determine_L1B=True):
     :return:
     """
     'Get the image data and an RGB composite of the scene'
-    if "L1B" not in str(file_name) and auto_determine_L1B:
+    if "L1B" not in str(file_name) or not auto_determine_L1B:
         wvl_bands, img = get_tile_data(file_name, sensor, key_in=identify_RGB_data(file_name))
         wvl_bands = np.asarray(wvl_bands)
     else:
