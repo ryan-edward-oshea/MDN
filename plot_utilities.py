@@ -434,7 +434,7 @@ def display_sat_rgb(file_name, sensor, figsize=(15, 5), title=None, ipython_mode
     'Get the geographic information'
     lon, lat, extent = get_tile_geographic_info(file_name)
     'Get the rgb composite'
-    rgb_img = find_rgb_img_nc(file_name, sensor,rhos=rhos,auto_determine_L1B)
+    rgb_img = find_rgb_img_nc(file_name, sensor,rhos=rhos,auto_determine_L1B=auto_determine_L1B)
     if flipud: rgb_img = np.flipud(rgb_img)
     
     'Display the results'
