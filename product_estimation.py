@@ -129,6 +129,9 @@ def get_estimates(args, x_train=None, y_train=None, x_test=None, y_test=None, ou
 
 	if len(outputs) == 1:
 		outputs = list(outputs.values())[0]
+	if len(model.output_slices.keys()) == 1 and args.sensor in ['MOD','VI','MERIS']:
+		renamed_slices      = [product_slice.replace('CDOM','g').replace('NAP','d').replace('TSS','tss').replace('Chl','chl') for product_slice in args.product.split(',')]
+		model.output_slices = {f'{product}': slice(i,i+1) for i,product in enumerate(renamed_slices)}
 	return outputs, model.output_slices
 
 

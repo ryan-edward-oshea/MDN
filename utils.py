@@ -28,7 +28,9 @@ supported_models = {
 	'PRISMA': ['aph,chl,tss,pc,ad,ag,cdom'],
 	'PACE': ['aph,chl,tss,pc,ad,ag,cdom'],
 	'PACE-sat': ['aph,chl,tss,pc,ad,ag,cdom'],
-
+	'VI' : ['Chl,TSS,aCDOM443,aCDOM555,aNAP443,aNAP555,aph443,aph488,aph555,aph667'],
+	'MOD' : ['Chl,TSS,aCDOM443,aCDOM555,aNAP443,aNAP555,aph443,aph488,aph555,aph667'],
+	'MERIS' : ['Chl,TSS,aCDOM443,aCDOM555,aNAP443,aNAP555,aph443,aph488,aph555,aph667'],
 }
 
 def current_support():
