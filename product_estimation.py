@@ -11,7 +11,7 @@ from .model import MDN
 from .meta  import get_sensor_bands, SENSOR_LABEL, ANCILLARY, PERIODIC
 from .utils import get_labels, get_data, generate_config, using_feature, split_data, _load_datasets, compress
 from .metrics import performance, mdsa, sspb, msa
-from .plot_utils import plot_scatter
+from .plot_utils import plot_scatter, plot_spectra
 from .benchmarks import run_benchmarks
 from .parameters import get_args
 from .transformers import TransformerPipeline, generate_scalers
@@ -94,6 +94,7 @@ def get_estimates(args, x_train=None, y_train=None, x_test=None, y_test=None, ou
 		}
 
 		model = MDN(**model_kwargs)
+        
 		model.fit(x_train, y_train, output_slices, args=args, datasets=datasets)
 
 		if return_model:
@@ -222,8 +223,8 @@ def generate_estimates(args, bands, x_train, y_train, x_test, y_test, slices, lo
     return benchmarks
 
 
-def main():
-	args = get_args()
+def main(kwargs):
+	args = get_args(kwargs,use_cmdline=False)
 
 	# If a file was given, estimate the product for the Rrs contained within
 	if args.filename:
@@ -280,9 +281,18 @@ def main():
 		(x_train, y_train), (x_test, y_test) = split_data(x_data, y_data, n_train=n_train, seed=args.seed)
 
 		benchmarks = generate_estimates(args, bands, x_train, y_train, x_test, y_test, slices, locs)
-		labels     = get_labels(bands, slices, y_test.shape[1])
+# 		labels     = get_labels(bands, slices, y_test.shape[1])
+
+		labels     = get_labels(bands, slices, y_test.shape[1], wavelengths_ad_ag= get_sensor_bands(f'{args.sensor}-adag', args) if args.use_HICO_aph else None, wavelengths_aph=get_sensor_bands(f'{args.sensor}-aph', args) if args.use_HICO_aph else None,use_HICO_aph=args.use_HICO_aph)
 		products   = args.product.split(',')
-		plot_scatter(y_test, benchmarks, bands, labels, products, args.sensor)
+		args.summary_stats = {}
+        
+		for product in products:
+				plot_scatter(y_test[:,slices[product]], benchmarks, bands, labels[slices[product]], product, args.sensor,args=args)
+				if product in ['aph'] and True: 
+								plot_spectra(y_test[:,slices[product]], benchmarks, bands, labels[slices[product]], product, args.sensor,args=args,y_full=y_test,slices=slices)
+        
+# 		plot_scatter(y_test, benchmarks, bands, labels, products, args.sensor,args=args)
 
 	# Otherwise, train a model with all data (if not already existing)
 	else:
