@@ -1,5 +1,5 @@
 from .metrics import slope, sspb, mdsa 
-from .meta import get_sensor_label
+from .meta import get_sensor_label,get_sensor_bands
 from .utils import closest_wavelength, ignore_warnings
 from collections import defaultdict as dd 
 from pathlib import Path 
@@ -39,7 +39,15 @@ def add_identity(ax, *line_args, **line_kwargs):
 	}
 	ax.annotate(r'$\mathbf{1:1}$', xy=(0.87,0.99), size=11, **ann_kwargs)
 
-
+def create_stats_HPC(y_true, y_est, metrics=[mdsa, sspb, slope],label=None):
+    ''' Create metrics for model comparison '''
+    summary_metrics = {}
+    for metric in metrics:
+        # print(metric.__name__)
+        label = metric.__name__#.replace('SSPB', 'Bias').replace('MdSA', 'Error')
+        print(label, metric(y_true, y_est))
+        summary_metrics[label] = metric(y_true, y_est)
+    return summary_metrics
 
 def _create_metric(metric, y_true, y_est, longest=None, label=None):
 	''' Create a position-aligned string which shows the performance via a single metric '''
@@ -278,224 +286,469 @@ def default_dd(d={}, f=lambda k: k):
 			return val 
 	return key_dd(f, d)
 
-
 @ignore_warnings
-def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None, methods=None, n_col=3, img_outlbl=''):
-	import matplotlib.patheffects as pe 
-	import matplotlib.ticker as ticker
-	import matplotlib.pyplot as plt 
-	import seaborn as sns 
+def plot_scatter(y_test, benchmarks, bands, labels, products, sensor, title=None, methods=None, n_col=3, img_outlbl='',args=None):
+    import matplotlib.patheffects as pe 
+    import matplotlib.ticker as ticker
+    import matplotlib.pyplot as plt 
+    import seaborn as sns 
 
-	folder = Path('scatter_plots')
-	folder.mkdir(exist_ok=True, parents=True)
+    folder = Path('scatter_plots')
+    folder.mkdir(exist_ok=True, parents=True)
 
-	product_labels = default_dd({
-		'chl' : 'Chl\\textit{a}',
-		'aph' : '\\textit{a}_{ph}',
-		'tss' : 'TSS',
-		'cdom': '\\textit{a}_{CDOM}',
-	})
-	
-	product_units = default_dd({
-		'chl' : '[mg m^{-3}]',
-		'tss' : '[g m^{-3}]',
-		'aph' : '[m^{-1}]',
-		'cdom': '[m^{-1}]',
-	}, lambda k: '')
+    product_labels = default_dd({
+        'chl' : 'Chl\\textit{a}',
+        'aph' : 'a_{\\textit{ph}}',
+        'ad' : 'a_{\\textit{nap}}',
+        'ag' : 'a_{\\textit{cdom}}',
+        'tss' : 'TSS',
+        'pc' : 'PC',
+        'cdom': 'CDOM',#'a_{\\textit{cdom}}(443)',   
+    })
+    
+    product_units = default_dd({
+        'chl' : '[mg m^{-3}]',
+        'pc' : '[mg m^{-3}]',
+        'tss' : '[g m^{-3}]',
+        'aph' : '[m^{-1}]',
+        'ad' : '[m^{-1}]',
+        'ag' : '[m^{-1}]',
 
-	model_labels = default_dd({
-		'MDN' : 'MDN_{A}',
-	})
+        'cdom': '[m^{-1}]',
+    }, lambda k: '')
 
-	products = [p for i,p in enumerate(np.atleast_1d(products)) if i < y_test.shape[-1]]
+    model_labels = default_dd({
+        'MDN' : 'MDN',
+    })
 
-	plt.rc('text', usetex=True)
-	plt.rcParams['mathtext.default']='regular'
-	# plt.rcParams['mathtext.fontset'] = 'stix'
-	# plt.rcParams['font.family'] = 'cm'
+    products = [p for i,p in enumerate(np.atleast_1d(products)) if i < y_test.shape[-1]]
 
-	# Only plot certain bands
-	if len(labels) > 3 and 'chl' not in products:
-		product_bands = {
-			'default' : [443, 482, 561, 655],
-			# 'aph'     : [443, 530],
-		}
+    plt.rc('text', usetex=True)
+    plt.rcParams['mathtext.default']='regular'
+    # plt.rcParams['mathtext.fontset'] = 'stix'
+    # plt.rcParams['font.family'] = 'cm'
 
-		target     = [closest_wavelength(w, bands) for w in product_bands.get(products[0], product_bands['default'])]
-		plot_label = [w in target for w in bands]
-		plot_order = ['MDN', 'QAA', 'GIOP']
-		plot_bands = True
-	else:
-		plot_label = [True] * len(labels)
-		plot_order = methods
-		plot_bands = False
+    # Only plot certain bands
+    if len(labels) > 3 :
+        product_bands = {
+            'default' :  [443,482,561,655] if 'OLI'  in sensor else [443,490,560,620,673,710]  if 'OLCI' in sensor  else [444,530,625,673,]  if args.use_HICO_aph  else  [409,443,478,535,620,673,690,724]  #[415,443,490,501,550,620,673,690] #[443,482,561,655]
+            # 'aph'     : [443, 530], [409, 421, 432, 444, 455, 467, 478, 490, 501, 512, 524, 535, 547, 558, 570, 581, 593, 604, 616, 621, 633, 644, 650, 656, 667, 673, 679, 684, 690, 701, 713, 724,]
+        }
 
-		if plot_order is None:
-			if 'chl' in products and len(products) == 1:
-				benchmarks = benchmarks['chl']
-				if 'MLP' in benchmarks:
-					plot_order = ['MDN', 'MLP', 'SVM', 'XGB', 'KNN', 'OC3']
-				else:
-					plot_order = ['MDN', 'Smith_Blend', 'OC6', 'Mishra_NDCI', 'Gons_2band', 'Gilerson_2band']
-			elif len(products) == 3 and all(k in products for k in ['chl', 'tss', 'cdom']):
-				n_col = 3
-				plot_order = {
-					'chl'  : ['MDN', 'OC3','Smith_Blend'],
-					'tss'  : ['MDN', 'SOLID', 'Novoa'],
-					'cdom' : ['MDN', 'Ficek', 'Mannino'],
-				}
-				plot_label = [True] * 3
-				plot_bands = True
+        target     = [closest_wavelength(w, bands if not args.use_HICO_aph else get_sensor_bands(f'{sensor}-aph', args) ) for w in product_bands.get(products[0], product_bands['default'])]
+        print('Target',target)
+        plot_label = [w in target for w in bands]
+        if args.use_HICO_aph: 
+            plot_label_aph = [w in target for w in get_sensor_bands(f'{sensor}-aph', args)]
+            #y_test=y_test[:,[ i in get_sensor_bands('HICO-aph', args) for i in  get_sensor_bands(sensor, args)]]
+        if args.use_HICO_aph and (products[0]=='ad' or products[0]=='ag'): 
+                product_bands = {
+                    'default' :  [get_sensor_bands(f'{sensor}-adag', args)[1],get_sensor_bands(f'{sensor}-adag', args)[4],get_sensor_bands(f'{sensor}-adag', args)[6]]  # list(get_sensor_bands('HICO-adag', args)) ##[415,444,478,535,564,593,621]#list(get_sensor_bands('HICO-adag', args))
+                }
+                target     = [closest_wavelength(w, bands if not args.use_HICO_aph else get_sensor_bands(f'{sensor}-adag', args)) for w in product_bands.get(products[0], product_bands['default'])]
+                plot_label_aph = [w in target for w in get_sensor_bands(f'{sensor}-adag', args)]
+        plot_label = [w in target for w in bands]
 
-	labels = [(p,label) for label in labels for p in products if p in label]
-	print('Plotting labels:', [l for i,l in enumerate(labels) if plot_label[i]])
-	assert(len(labels) == y_test.shape[-1]), [len(labels), y_test.shape]
+        plot_order =  ['MDN']
+        plot_order = [val  for i,val in enumerate(plot_order) if val in benchmarks[products[0]].keys()]
+        
+        plot_bands = True
+    else:
+        plot_label = [True] * len(labels)
+        plot_order = methods
+        plot_bands = False
 
-	# plot_order = [p for p in plot_order if p in benchmarks]
-	fig_size   = 5
-	n_col      = max(n_col, sum(plot_label))
-	n_row      = max(1,int(not plot_bands) + int(0.5 + len(plot_order) / (1 if plot_bands else n_col)) -1)
-	if isinstance(plot_order, dict): n_row = 3
-	if plot_bands:
-		n_col, n_row = n_row, n_col
+        if plot_order is None:
+            if len(products) == 1:
+                plot_order = ['MDN']
+            if 'chl' in products and len(products) == 1:
+            #     # benchmarks = benchmarks['chl']
+            #     if 'MLP' in benchmarks:
+                plot_order = ['MDN', 'Gilerson_2band', 'Smith_Blend']  if 'OLI' not in sensor else   ['MDN',]   #OC3 GIOP , 'Gilerson_2band', 'Smith_Blend'
+            if 'tss' in products and len(products) == 1:
+                #     # benchmarks = benchmarks['chl']
+                #     if 'MLP' in benchmarks:
+                    plot_order = ['MDN', 'Nechad', 'Novoa']
+            if 'cdom' in products and len(products) == 1:
+                #     # benchmarks = benchmarks['chl']
+                #     if 'MLP' in benchmarks:
+                    plot_order = ['MDN', 'QAA_CDOM', 'Ficek']
+            if 'pc' in products and len(products) == 1:
+                #     # benchmarks = benchmarks['chl']
+                #     if 'MLP' in benchmarks:
+                    plot_order = ['MDN','Schalles','Sim2005'] if 'OLI' not in sensor else  ['MDN',]  #'Schalles','Sim2005'
+            if len(products) == 1:
+                plot_order = [val  for i,val in enumerate(plot_order) if val in benchmarks[products[0]].keys()]
+            #     else:
+            #         plot_order = ['MDN']
+            # elif len(products) == 3 and all(k in products for k in ['chl', 'tss', 'cdom']):
+            #     n_col = 3
+            #     plot_order = {
+            #         'chl'  : ['MDN', 'OC3','Smith_Blend'],
+            #         'tss'  : ['MDN', 'SOLID', 'Novoa'],
+            #         'cdom' : ['MDN', 'Ficek', 'Mannino'],
+            #     }
+            #     plot_label = [True] * 3
+            #     plot_bands = True
+            # elif len(products) == 3 and all(k in products for k in ['chl', 'pc', 'ad']):
+            #     n_col = 3
+            #     plot_order = {
+            #         'chl'  : ['MDN',],
+            #         'pc'  : ['MDN',],
+            #     #    'ad' : ['MDN',],
+            #     }
+            #     plot_label = [True] * 3
+            #     plot_bands = True
 
-	fig, axes = plt.subplots(n_row, n_col, figsize=(fig_size*n_col, fig_size*n_row+1))
-	axes      = [ax for axs in np.atleast_1d(axes) for ax in np.atleast_1d(axs)]
-	colors    = ['xkcd:sky blue', 'xkcd:tangerine', 'xkcd:fresh green', 'xkcd:greyish blue', 'xkcd:goldenrod',  'xkcd:clay', 'xkcd:bluish purple', 'xkcd:reddish']
+    labels = [(p,label) for label in labels for p in products if p in label]
+    print('Plotting labels:', [l for i,l in enumerate(labels)] ) #if plot_label[i]]
+    assert(len(labels) == y_test.shape[-1]), [len(labels), y_test.shape]
 
-	print('Order:', plot_order)
-	print(f'Plot size: {n_row} x {n_col}')
-	print(labels)
+    # plot_order = [p for p in plot_order if p in benchmarks]
+    fig_size   = 5
+    n_col      = max(n_col, sum(plot_label_aph if args.use_HICO_aph and (products[0]=='ad' or products[0]=='ag') else plot_label )) 
+    n_row      = max(1,int(not plot_bands) + int(0.5 + len(plot_order) / (1 if plot_bands else n_col)) - int(not plot_bands))
+    if isinstance(plot_order, dict): n_row = 3
+    if plot_bands:
+        n_col, n_row = n_row, n_col
 
-	curr_idx = 0
-	full_ax  = fig.add_subplot(111, frameon=False)
-	full_ax.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False, pad=10)
+    fig, axes = plt.subplots(n_row, n_col, figsize=(fig_size*n_col, fig_size*n_row+1))
+    axes      = [ax for axs in np.atleast_1d(axes) for ax in np.atleast_1d(axs)]
+    colors    = ['xkcd:sky blue', 'xkcd:tangerine', 'xkcd:fresh green', 'xkcd:greyish blue', 'xkcd:goldenrod',  'xkcd:clay', 'xkcd:bluish purple', 'xkcd:reddish']
 
-	estimate_label = 'Estimated' #'Satellite-derived'
-	x_pre  = 'Measured'
-	y_pre  = estimate_label.replace('-', '\\textbf{-}')
-	plabel = f'{product_labels[products[0]]} {product_units[products[0]]}'
-	xlabel = fr'$\mathbf{{{x_pre} {plabel}}}$'
-	ylabel = fr'$\mathbf{{{y_pre}}}$'+'' +fr'$\mathbf{{ {plabel}}}$'
-	if not isinstance(plot_order, dict):
-		full_ax.set_xlabel(xlabel.replace(' ', '\ '), fontsize=20, labelpad=10)
-		full_ax.set_ylabel(ylabel.replace(' ', '\ '), fontsize=20, labelpad=10)
-	else:
-		full_ax.set_xlabel(fr'$\mathbf{{{x_pre} Product}}$'.replace(' ', '\ '), fontsize=20, labelpad=10)
+    print('Order:', plot_order)
+    print(f'Plot size: {n_row} x {n_col}')
+    print(labels)
 
-	s_lbl = title or get_sensor_label(sensor).replace('-',' ')
-	n_pts = len(y_test)
-	title = fr'$\mathbf{{\underline{{\large{{{s_lbl}}}}}}}$' + '\n' + fr'$\small{{\mathit{{N\small{{=}}}}{n_pts}}}$'
-	# full_ax.set_title(title.replace(' ', '\ '), fontsize=24, y=1.06)
+    curr_idx = 0
+    full_ax  = fig.add_subplot(111, frameon=False)
+    full_ax.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False, pad=10)
 
-	if isinstance(plot_order, dict):
-		full_ax.set_title(fr'$\mathbf{{\underline{{\large{{{s_lbl}}}}}}}$'.replace(' ', '\ '), fontsize=24, y=1.03)
+    estimate_label = 'Estimated' #'Satellite-derived'
+    x_pre  = 'Measured'
+    y_pre  = estimate_label.replace('-', '\\textbf{-}')
+    plabel = f'{product_labels[products[0]]} {product_units[products[0]]}'
+    xlabel = fr'$\mathbf{{{x_pre} {plabel} }}$'
+    ylabel = fr'$\mathbf{{{y_pre}}}$'+'' +fr'$\mathbf{{ {plabel}}}$'
+    if not isinstance(plot_order, dict):
+        full_ax.set_xlabel(xlabel.replace(' ', '\ '), fontsize=20, labelpad=10)
+        full_ax.set_ylabel(ylabel.replace(' ', '\ '), fontsize=20, labelpad=10)
+    else:
+        full_ax.set_xlabel(fr'$\mathbf{{{x_pre} Product}}$'.replace(' ', '\ '), fontsize=20, labelpad=10)
 
-	for plt_idx, (label, y_true) in enumerate(zip(labels, y_test.T)):
-		if not plot_label[plt_idx]: continue 
+    s_lbl = title or get_sensor_label(sensor).replace('-',' ')
+    n_pts = len(y_test)
+    title = fr'$\mathbf{{\underline{{\large{{{s_lbl}}}}}}}$' + '\n' + fr'$\small{{\mathit{{N\small{{=}}}}{n_pts}}}$'
+    # full_ax.set_title(title.replace(' ', '\ '), fontsize=24, y=1.06)
 
-		product, title = label 
-		plabel = f'{product_labels[product]} {product_units[product]}'
+    if isinstance(plot_order, dict):
+        full_ax.set_title(fr'$\mathbf{{\underline{{\large{{{s_lbl}}}}}}}$'.replace(' ', '\ '), fontsize=24, y=1.03)
 
-		for est_idx, est_lbl in enumerate(plot_order[product] if isinstance(plot_order, dict) else plot_order):
-			if plt_idx >= (len(plot_order[product]) if isinstance(plot_order, dict) else benchmarks[est_lbl].shape[1]): continue
-			if isinstance(plot_order, dict) and est_lbl not in benchmarks[product]: 
-				axes[curr_idx].tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
-				axes[curr_idx].axis('off')
-				curr_idx += 1
-				continue 
+    for plt_idx, (label, y_true) in enumerate(zip(labels, y_test.T)):
+        
 
-			y_est = benchmarks[product][est_lbl] if isinstance(plot_order, dict) else benchmarks[est_lbl][..., plt_idx]
-			ax    = axes[curr_idx]
-			cidx  = (curr_idx % n_col) if plot_bands else curr_idx
-			color = colors[cidx]
 
-			first_row = curr_idx < n_col #(curr_idx % n_row) == 0
-			last_row  = curr_idx >= ((n_row-1)*n_col) #((curr_idx+1) % n_row) == 0
-			first_col = (curr_idx % n_col) == 0
-			last_col  = ((curr_idx+1) % n_col) == 0
-			print(curr_idx, first_row, last_row, first_col, last_col, est_lbl, product, plabel)
-			y_est_log  = np.log10(y_est).flatten()
-			y_true_log = np.log10(y_true).flatten()
-			curr_idx  += 1
+        product, title = label 
+        if args.use_HICO_aph and (product=='aph' or product=='ag' or product=='ad'):
+            print(label,plt_idx)
+            if not plot_label_aph[plt_idx]: continue 
+        else:
+            if not plot_label[plt_idx]: continue 
+        plabel = f'{product_labels[product]} {product_units[product]}'
 
-			l_kws = {'color': color, 'path_effects': [pe.Stroke(linewidth=4, foreground='k'), pe.Normal()], 'zorder': 22, 'lw': 1}
-			s_kws = {'alpha': 0.4, 'color': color}#, 'edgecolor': 'grey'}
+        for est_idx, est_lbl in enumerate(plot_order[product] if isinstance(plot_order, dict) else plot_order):
+            # if plt_idx >= (len(plot_order[product]) if isinstance(plot_order, dict) else benchmarks[product][est_lbl].shape[1]): continue
+            if isinstance(plot_order, dict) and est_lbl not in benchmarks[product]: 
+                axes[curr_idx].tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False)
+                axes[curr_idx].axis('off')
+                curr_idx += 1
+                continue 
+            if est_lbl =='GIOP' or est_lbl =='QAA':
+                # valid_bool = []
+                # wvls = get_sensor_bands(sensor, args)
+                valid_bool = []
+                required_wvl = get_sensor_bands(f'{sensor}-adag', args)
+                wvls = get_sensor_bands(sensor, args)
+                for required_wvl_i in required_wvl:
+                    wvl_diff = [i.item() for i in np.abs(wvls - required_wvl_i)]
+                    wvl_diff_bool = [wvl_diff_i < 4 for wvl_diff_i in wvl_diff]
+                    valid_bool.append([wvl_diff_bool_i if np.argmin(wvl_diff) == i else False for  i,wvl_diff_bool_i in enumerate(wvl_diff_bool) ])
+                
+                valid_wvl_ad_ag =np.any(np.array(valid_bool),axis=0)
+                
+                if not args.use_HICO_aph or (np.shape(benchmarks[product][est_lbl])[1] !=  np.shape(get_sensor_bands(f'{sensor}-aph', args))[0] and args.use_HICO_aph and product=='aph')  or (np.shape(benchmarks[product][est_lbl])[1] !=  np.shape(get_sensor_bands(f'{sensor}-adag', args))[0] and args.use_HICO_aph and (product=='ad' or product=='ag' ) ):
+                    benchmarks[product][est_lbl] = np.reshape(benchmarks[product][est_lbl],(-1,np.shape(get_sensor_bands(sensor, args))[0]))   #if not args.use_HICO_aph  else np.reshape(benchmarks[product][est_lbl],(-1,np.shape(get_sensor_bands('HICO-aph', args))[0])) #if np.shape(benchmarks[product][est_lbl])[0] == 1786*np.shape(get_sensor_bands(sensor, args))[0] else  np.reshape(benchmarks[product][est_lbl],(1786,np.shape(get_sensor_bands(sensor, args))[0])) #np.shape(benchmarks[product]['MDN']))
+                #Resample to HICO_aph wavelengths
+                if args.use_HICO_aph and np.shape(benchmarks[product][est_lbl])[1] ==  np.shape(get_sensor_bands(sensor, args))[0] and product == 'aph':
+                    benchmarks[product][est_lbl] = benchmarks[product][est_lbl][:,[ i in get_sensor_bands(f'{sensor}-aph', args) for i in  get_sensor_bands(sensor, args)]]
+                if args.use_HICO_aph and np.shape(benchmarks[product][est_lbl])[1] ==  np.shape(get_sensor_bands(sensor, args))[0] and (product == 'ad' or  product == 'ag'):
+                    benchmarks[product][est_lbl] = benchmarks[product][est_lbl][:,valid_wvl_ad_ag ] #[ i in get_sensor_bands(f'{sensor}-adag', args) for i in  get_sensor_bands(sensor, args)]]            
 
-			if est_lbl == 'MDN':
-				[i.set_linewidth(5) for i in ax.spines.values()]
-				est_lbl = 'MDN_{A}'
-				# est_lbl = 'MDN-I'
-			else:
-				est_lbl = est_lbl.replace('Mishra_','').replace('Gons_2band', 'Gons').replace('Gilerson_2band', 'GI2B').replace('Smith_','').replace('Cao_XGB','BST')#.replace('Cao_', 'Cao\ ')
 
-			if product not in ['chl', 'tss', 'cdom'] and last_col:
-				ax2 = ax.twinx()
-				ax2.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False, pad=0)
-				ax2.grid(False)
-				ax2.set_yticklabels([])
-				ax2.set_ylabel(fr'$\mathbf{{{bands[plt_idx]:.0f}nm}}$', fontsize=20)
+            
+            
+            y_est = benchmarks[product][est_lbl] if isinstance(plot_order, dict) else benchmarks[product][est_lbl][..., plt_idx]
+            ax    = axes[curr_idx]
+            cidx  = (curr_idx % n_col) if plot_bands else curr_idx
+            color = colors[cidx]
 
-			minv = -2 if product == 'cdom' else -1 # int(np.nanmin(y_true_log)) - 1 if product != 'aph' else -4
-			maxv = 3 if product == 'tss' else 3 if product == 'chl' else 1 #int(np.nanmax(y_true_log)) + 1 if product != 'aph' else 1
-			loc  = ticker.LinearLocator(numticks=int(round(maxv-minv+1.5)))
-			fmt  = ticker.FuncFormatter(lambda i, _: r'$10$\textsuperscript{%i}'%i)
+            first_row = curr_idx < n_col #(curr_idx % n_row) == 0
+            last_row  = curr_idx >= ((n_row-1)*n_col) #((curr_idx+1) % n_row) == 0
+            first_col = (curr_idx % n_col) == 0
+            last_col  = ((curr_idx+1) % n_col) == 0
+            print(curr_idx, first_row, last_row, first_col, last_col, est_lbl, product, plabel, sum(np.isfinite(y_true)))
+            if not (('Scdom443' in products and len(products)==1) or ('Snap443' in products and len(products)==1)):
 
-			ax.set_ylim((minv, maxv))
-			ax.set_xlim((minv, maxv))
-			ax.xaxis.set_major_locator(loc)
-			ax.yaxis.set_major_locator(loc)
-			ax.xaxis.set_major_formatter(fmt)
-			ax.yaxis.set_major_formatter(fmt)
-			
-			# if not last_row:                   ax.set_xticklabels([])
-			# elif isinstance(plot_order, dict): ax.set_xlabel(fr'$\mathbf{{{x_pre}}}$'+'' +fr'$\mathbf{{ {plabel}}}$'.replace(' ', '\ '), fontsize=18)
-			if not first_col:                  ax.set_yticklabels([])
-			elif isinstance(plot_order, dict): 
-				ylabel = fr'$\mathbf{{{y_pre}}}$'+'' +fr'$\mathbf{{ {plabel}}}$' + '\n' + fr'$\small{{\mathit{{N\small{{=}}}}{np.isfinite(y_true_log).sum()}}}$'
-				ax.set_ylabel(ylabel.replace(' ', '\ '), fontsize=18)
+                y_est_log  = np.log10(y_est).flatten()
+                y_true_log = np.log10(y_true).flatten()
+            else:
+                y_est_log  = (y_est).flatten()
+                y_true_log = (y_true).flatten()                
+            curr_idx  += 1
 
-			valid = np.logical_and(np.isfinite(y_true_log), np.isfinite(y_est_log))
-			if valid.sum():
-				sns.regplot(y_true_log[valid], y_est_log[valid], ax=ax, scatter_kws=s_kws, line_kws=l_kws, fit_reg=True, truncate=False, robust=True, ci=None)
-				kde = sns.kdeplot(y_true_log[valid], y_est_log[valid], shade=False, ax=ax, bw='scott', n_levels=4, legend=False, gridsize=100, color=color)
-				# kde.collections[2].set_alpha(0)
+            l_kws = {'color': color, 'path_effects': [pe.Stroke(linewidth=4, foreground='k'), pe.Normal()], 'zorder': 22, 'lw': 1}
+            s_kws = {'alpha': 0.4, 'color': color}#, 'edgecolor': 'grey'}
 
-			invalid = np.logical_and(np.isfinite(y_true_log), ~np.isfinite(y_est_log))
-			if invalid.sum():
-				ax.scatter(y_true_log[invalid], [minv]*(invalid).sum(), color='r', alpha=0.4, label=r'$\mathbf{%s\ invalid}$' % (invalid).sum())
-				ax.legend(loc='lower right', prop={'weight':'bold', 'size': 16})
+            if est_lbl == 'MDN':
+                [i.set_linewidth(5) for i in ax.spines.values()]
+                est_lbl = 'MDN'
+                # est_lbl = 'MDN-I'
+            else:
+                est_lbl = est_lbl.replace('Mishra_','').replace('Gons_2band', 'Gons').replace('Gilerson_2band', 'GI2B').replace('Smith_','').replace('Cao_XGB','BST') #.replace('Schalles', 'Schalles and Yacobi (2000)').replace('Sim2005', 'Simis et al. 2005')#.replace('Cao_', 'Cao\ ')
 
-			add_identity(ax, ls='--', color='k', zorder=20)
+            if product not in ['chl', 'tss', 'cdom','pc','nap','SCDOM','SNAP'] and last_col:
+                ax2 = ax.twinx()
+                ax2.tick_params(labelcolor='none', top=False, bottom=False, left=False, right=False, pad=0)
+                ax2.grid(False)
+                ax2.set_yticklabels([])
+                if args.use_HICO_aph and product == 'aph':
+                    bands_aph = get_sensor_bands(f'{sensor}-aph', args)
+                    ax2.set_ylabel(fr'$\mathbf{{{bands_aph[plt_idx]:.0f}nm}}$' f"\n" f"N={sum(np.isfinite(y_true))}", fontsize=20)
+                else:
+                    if args.use_HICO_aph and (product == 'ad' or product == 'ag' ) :
+                        bands_adag = get_sensor_bands(f'{sensor}-adag', args)
+                        ax2.set_ylabel(fr'$\mathbf{{{bands_adag[plt_idx]:.0f}nm}}$' f"\n" f"N={sum(np.isfinite(y_true))}", fontsize=20)
+                    else:
+                        ax2.set_ylabel(fr'$\mathbf{{{bands[plt_idx]:.0f}nm}}$' f"\n" f"N={sum(np.isfinite(y_true))}", fontsize=20)
 
-			if valid.sum():
-				add_stats_box(ax, y_true[valid], y_est[valid])
 
-			if first_row or not plot_bands or (isinstance(plot_order, dict) and plot_order[product][est_idx] != 'MDN'):
-				if est_lbl == 'BST':
-					# ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$'+'\n'+r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$', fontsize=18)
-					ax.set_title(r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$' + '\n' + fr'$\mathbf{{\large{{{est_lbl}}}}}$', fontsize=18, linespacing=0.95)
-				
-				elif est_lbl == 'Ficek':
-					# ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$'+'\n'+r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$', fontsize=18)
-					ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$' + r'$\small{\textit{\ (et\ al.\ 2011)}}$', fontsize=18, linespacing=0.95)
-				
-				elif est_lbl == 'Mannino':
-					# ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$'+'\n'+r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$', fontsize=18)
-					ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$' + r'$\small{\textit{\ (et\ al.\ 2008)}}$', fontsize=18, linespacing=0.95)
 
-				elif est_lbl == 'Novoa':
-					# ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$'+'\n'+r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$', fontsize=18)
-					ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$' + r'$\small{\textit{\ (et\ al.\ 2017)}}$', fontsize=18, linespacing=0.95)
+            minv = -3 if product == 'cdom' else 0.000 if product == 'Scdom443' else .005 if product == 'Snap443' else int(np.nanmin(y_true_log)) - 1 if product != 'aph' and product != 'ag' and product != 'ad'  else -4
+            maxv = 3 if product == 'tss' else 4 if product == 'chl' else .035 if product == 'Scdom443' else .02 if product == 'Snap443' else int(np.nanmax(y_true_log)) + 1 if product != 'aph' and product != 'ag' and product != 'ad'  else 2
+            loc  = ticker.LinearLocator(numticks=int(round(maxv-minv+1)))
+            fmt  = ticker.FuncFormatter(lambda i, _: r'$10$\textsuperscript{%i}'%i)
+            
+            ax.set_ylim((minv, maxv))
+            ax.set_xlim((minv, maxv))
+            ax.xaxis.set_major_locator(loc)
+            ax.yaxis.set_major_locator(loc)
+            if not (('Scdom443' in products and len(products)==1) or ('Snap443' in products and len(products)==1)):
+                ax.xaxis.set_major_formatter(fmt)
+                ax.yaxis.set_major_formatter(fmt)
+            else:
+                if product == 'Scdom443':
+                    ax.xaxis.set_ticks(np.arange(0, 0.03, 0.01))
+                    ax.yaxis.set_ticks(np.arange(0, 0.03, 0.01))
+                if product == 'Snap443':
+                    ax.xaxis.set_ticks(np.arange(0.0025, 0.02, 0.01))
+                    ax.yaxis.set_ticks(np.arange(0.0025, 0.02, 0.01))
+            # if not last_row:                   ax.set_xticklabels([])
+            # elif isinstance(plot_order, dict): ax.set_xlabel(fr'$\mathbf{{{x_pre}}}$'+'' +fr'$\mathbf{{ {plabel}}}$'.replace(' ', '\ '), fontsize=18)
+            if not first_col:                  ax.set_yticklabels([])
+            elif isinstance(plot_order, dict): 
+                ylabel = fr'$\mathbf{{{y_pre}}}$'+'' +fr'$\mathbf{{ {plabel}}}$' + '\n' + fr'$\small{{\mathit{{N\small{{=}}}}{np.isfinite(y_true_log).sum()}}}$'
+                ax.set_ylabel(ylabel.replace(' ', '\ '), fontsize=18)
 
-				else: ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$', fontsize=18)
+            valid = np.logical_and(np.isfinite(y_true_log), np.isfinite(y_est_log))
+            if valid.sum():
+                sns.regplot(y_true_log[valid], y_est_log[valid], ax=ax, scatter_kws=s_kws, line_kws=l_kws, fit_reg=True, truncate=False, robust=True, ci=None)
+                kde = sns.kdeplot(y_true_log[valid], y_est_log[valid], shade=False, ax=ax, bw='scott', n_levels=4, legend=False, gridsize=100, color='k')
+                # kde.collections[2].set_alpha(0)
 
-			ax.tick_params(labelsize=18)
-			ax.grid('on', alpha=0.3)
+            invalid = np.logical_and(np.isfinite(y_true_log), ~np.isfinite(y_est_log))
+            if invalid.sum():
+                ax.scatter(y_true_log[invalid], [minv]*(invalid).sum(), color='r', alpha=0.4, label=r'$\mathbf{%s\ invalid}$' % (invalid).sum())
+                ax.legend(loc='lower right', prop={'weight':'bold', 'size': 16})
 
-	u_label  = ",".join([o.split('_')[0] for o in plot_order]) if len(plot_order) < 10 else f'{n_row}x{n_col}'
-	filename = folder.joinpath(f'{img_outlbl}{",".join(products)}_{sensor}_{n_pts}test_{u_label}.png')
-	plt.tight_layout()
-	# plt.subplots_adjust(wspace=0.35)
-	plt.savefig(filename.as_posix(), dpi=100, bbox_inches='tight', pad_inches=0.1,)
-	plt.show()
+            add_identity(ax, ls='--', color='k', zorder=20)
+
+            if valid.sum():
+                add_stats_box(ax, y_true[valid], y_est[valid],metrics=[mdsa,sspb,slope])
+                # if plot_order[est_idx] == 'MDN' and product == 'aph': 
+                #     if plot_order[est_idx] not in args.summary_stats.keys(): args.summary_stats[ plot_order[est_idx]] = {}
+                #     args.summary_stats[ plot_order[est_idx]][label[1]] = create_stats_HPC(y_true[valid], y_est[valid], metrics=[mdsa, sspb, slope],label=None)
+                # else:
+                if plot_order[est_idx] not in args.summary_stats.keys(): args.summary_stats[ plot_order[est_idx]] = {}
+                args.summary_stats[ plot_order[est_idx]][label[1]] = create_stats_HPC(y_true[valid], y_est[valid], metrics=[mdsa, sspb, slope],label=None)
+
+
+            if first_row or not plot_bands or (isinstance(plot_order, dict) and plot_order[product][est_idx] != 'MDN'):
+                if est_lbl == 'BST':
+                    # ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$'+'\n'+r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$', fontsize=18)
+                    ax.set_title(r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$' + '\n' + fr'$\mathbf{{\large{{{est_lbl}}}}}$', fontsize=18, linespacing=0.95)
+                
+                elif est_lbl == 'QAA_CDOM':
+                    # ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$'+'\n'+r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$', fontsize=18)
+                    ax.set_title( r'$\mathbf{{\large{QAA}}}' + r'$\small{\textit{CDOM}', fontsize=18, linespacing=0.95)
+          
+                elif est_lbl == 'Ficek':
+                    # ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$'+'\n'+r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$', fontsize=18)
+                    ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$' + r'$\small{\textit{\ (et\ al.\ 2011)}}$', fontsize=18, linespacing=0.95)
+
+                                
+                elif est_lbl == 'Mannino':
+                    # ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$'+'\n'+r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$', fontsize=18)
+                    ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$' + r'$\small{\textit{\ (et\ al.\ 2008)}}$', fontsize=18, linespacing=0.95)
+
+                elif est_lbl == 'Novoa':
+                    # ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$'+'\n'+r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$', fontsize=18)
+                    ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$' + r'$\small{\textit{\ (et\ al.\ 2017)}}$', fontsize=18, linespacing=0.95)
+                elif est_lbl == 'Sim2005':
+                    # ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$'+'\n'+r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$', fontsize=18)
+                    est_lb='Simis'
+                    ax.set_title(fr'$\mathbf{{\large{{{est_lb}}}}}$' + r'$\small{\textit{\ (et\ al.\ 2005)}}$', fontsize=18, linespacing=0.95)
+                    
+                elif est_lbl == 'GI2B':
+                    # ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$'+'\n'+r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$', fontsize=18)
+                    est_lb='Gilerson'
+                    ax.set_title(fr'$\mathbf{{\large{{{est_lb}}}}}$' + r'$\small{\textit{\ (et\ al.\ 2010)}}$', fontsize=18, linespacing=0.95)
+                elif est_lbl == 'Blend':
+                    # ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$'+'\n'+r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$', fontsize=18)
+                    est_lb='Smith'
+                    ax.set_title(fr'$\mathbf{{\large{{{est_lb}}}}}$' + r'$\small{\textit{\ (et\ al.\ 2018)}}$', fontsize=18, linespacing=0.95)
+                elif est_lbl == 'Nechad':
+                    # ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$'+'\n'+r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$', fontsize=18)
+                    # est_lb='Smith'
+                    ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$' + r'$\small{\textit{\ (et\ al.\ 2010)}}$', fontsize=18, linespacing=0.95)                    
+                elif est_lbl == 'Schalles':
+                    # ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$'+'\n'+r'$\small{\textit{(Cao\ et\ al.\ 2020)}}$', fontsize=18)
+                    est_lb='Schalles\ and\ Yacobi'
+                    ax.set_title(fr'$\mathbf{{\large{{{est_lb}}}}}$' + r'$\small{\textit{\ (et\ al.\ 2005)}}$', fontsize=18, linespacing=0.95)
+                else: ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$' '\n' f'(N={sum(np.isfinite(y_true))})', fontsize=18) if first_col else  ax.set_title(fr'$\mathbf{{\large{{{est_lbl}}}}}$' , fontsize=18)
+            # ax.x
+            ax.tick_params(labelsize=18)
+            ax.grid('on', alpha=0.3)
+            from pylab import text
+            #text(0.9,0.1,f'N={sum(np.isfinite(y_true))}',fontsize=12)
+            
+    u_label  = ",".join([o.split('_')[0] for o in plot_order]) if len(plot_order) < 10 else f'{n_row}x{n_col}'
+    out_dir = args.config_name
+    print('OUTLBL is: ',out_dir)
+    import os
+    os.makedirs(str(folder) + '/' + out_dir,exist_ok=True)
+    filename = folder.joinpath(f'{out_dir}/{img_outlbl}{",".join(products)}_{sensor}_{n_pts}test_{u_label}.png')
+    plt.tight_layout()
+    # plt.subplots_adjust(wspace=0.35)
+    plt.savefig(filename.as_posix(), dpi=600, bbox_inches='tight', pad_inches=0.1,)
+    plt.show()
+    
+def plot_spectra(y_test, benchmarks, bands, labels, products, sensor, title=None, methods=None, n_col=3, img_outlbl='',args=None,y_full=None,slices=None):
+    aph_wavelengths = get_sensor_bands('HICO-aph', args) if args.use_HICO_aph else get_sensor_bands(sensor, args)
+    ag_wavelengths = get_sensor_bands('HICO-adag', args) if args.use_HICO_aph else get_sensor_bands(sensor, args)
+    product_labels = default_dd({
+        'chl' : 'Chl\\textit{a}',
+        'aph' : '\\textit{a}_{ph}',
+        'ad' : '\\textit{a}_{d}',
+        'ag' : '\\textit{a}_{g}',
+        'tss' : 'TSS',
+        'pc' : 'PC',
+        'cdom': '\\textit{a}_{CDOM}',   
+    })
+    
+    product_units = default_dd({
+        'chl' : '[mg m^{-3}]',
+        'pc' : '[mg m^{-3}]',
+        'tss' : '[g m^{-3}]',
+        'aph' : '[m^{-1}]',
+        'ad' : '[m^{-1}]',
+        'ag' : '[m^{-1}]',
+
+        'cdom': '[m^{-1}]',
+    }, lambda k: '')
+    
+    font = {'family' : 'normal',
+            'weight' : 'bold',
+            'size'   : 20}
+    
+    import matplotlib.pyplot as plt
+    from matplotlib.figure import figaspect
+    import scipy.stats as stats
+
+    folder = Path('scatter_plots')
+    folder.mkdir(exist_ok=True, parents=True)
+    colors = ['aqua', 'orangered',  'xkcd:tangerine', 'xkcd:fresh green', 'xkcd:clay', 'magenta', 'xkcd:sky blue', ]
+    index = 1
+    for index in range(len(y_test)):
+        if sum(np.isnan(y_test[index,:])) or sum(np.isnan(y_full[:,slices['chl']][index,:])) or sum(np.isnan(y_full[:,slices['pc']][index,:])): continue
+        if index not in [1297,2099,2263]: continue
+        W, H = figaspect(0.4)
+        fig = plt.figure(figsize=(1.5*W, 1.5*H))
+        
+        ax = fig.add_subplot(131)
+        ax.grid(color='black',alpha=0.1)
+        ax.set_axisbelow(True)
+        ax.plot(aph_wavelengths,benchmarks['aph']['MDN'][index,:],label='MDN',color=colors[3])
+        ax.plot(aph_wavelengths,benchmarks['aph']['GIOP'][index,:],label='GIOP',color=colors[1])
+        ax.plot(aph_wavelengths,benchmarks['aph']['QAA'][index,:],label='QAA',color=colors[2])
+        ax.plot(aph_wavelengths,y_test[index,:],label='Truth',color='k')
+        plabel = f'{product_labels["aph"]} {product_units["aph"]}'
+    
+        if index  in [2263]: ax.set_title(fr'$\mathbf{{{plabel}}}$',fontsize=28)
+        plabel_x = f'Wavelength \ [nm]'
+        # ax.set_xlabel(fr'$\mathbf{{{plabel_x}}}$')
+        chl_conc = str(round(y_full[:,slices['chl']][index][0],1))
+        chl_conc = f'{chl_conc:>7}'.replace(" ","\ ")
+        pc_conc =  str(round(y_full[:,slices['pc']][index][0],1))
+        pc_conc = f'{pc_conc:>7}'.replace(" ","\ ")
+
+        cdom_conc = str(round(y_full[:,slices['cdom']][index][0],1))
+        cdom_conc = f'{cdom_conc:>5}'.replace(" ","\ ")
+
+        tss_conc = str(round(y_full[:,slices['tss']][index][0],1))
+        tss_conc = f'{tss_conc:>7}'.replace(" ","\ ")
+
+        from pylab import text
+
+        if index  in [2263]: ax.legend()
+        ax.set_xlim([400,700])
+    
+        ax = fig.add_subplot(132)
+    
+        ax.grid(color='black',alpha=0.1)
+        ax.set_axisbelow(True)
+        ax.plot(ag_wavelengths,benchmarks['ag']['MDN'][index,:],label='MDN',color=colors[3])
+        QAA =  np.reshape(benchmarks['ag']['QAA'],(-1,np.shape(get_sensor_bands(sensor, args))[0]))
+        ax.plot(bands,QAA[index,:],label='QAA',color=colors[2])
+        ax.plot(ag_wavelengths,y_full[:,slices['ag']][index,:],label='Truth',color='k')
+        plabel = f'{product_labels["ag"]} {product_units["ag"]}'
+        
+        if index  in [2263]:ax.set_title(fr'$\mathbf{{{plabel}}}$',fontsize=28)
+        plabel_x = f'Wavelength \ [nm]'
+        if index not in [2099,2263]: ax.set_xlabel(fr'$\mathbf{{{plabel_x}}}$',fontsize=28)
+        ax.set_xlim([400,700])
+        chl_text = "Chl:" 
+        text(0.65,0.865,f'Chl:\ \ \ \ {{{{{chl_conc}}}}}  \n PC: \ \ \ \ {{{pc_conc}}} \n CDOM: {{{cdom_conc}}} \nTSS: \ \ {tss_conc}   ',horizontalalignment='left',verticalalignment='center',transform=ax.transAxes,backgroundcolor='1.0',bbox=dict(facecolor='white',edgecolor='black',boxstyle='round'),fontdict=font)
+
+        ax = fig.add_subplot(133)
+    
+        ax.grid(color='black',alpha=0.1)
+        ax.set_axisbelow(True)
+        ax.plot(ag_wavelengths,benchmarks['ad']['MDN'][index,:],label='MDN',color=colors[3])
+        ax.plot(ag_wavelengths,y_full[:,slices['ad']][index,:],label='Truth',color='k')
+        plabel = f'{product_labels["ad"]} {product_units["ad"]}'
+        
+        if index  in [2263]: ax.set_title(fr'$\mathbf{{{plabel}}}$',fontsize=28)
+        plabel_x = f'Wavelength \ [nm]'
+        # ax.set_xlabel(fr'$\mathbf{{{plabel_x}}}$')
+        ax.set_xlim([400,700])
+
+        out_dir = args.config_name
+        print('OUTLBL is: ',out_dir)
+        import os
+        os.makedirs(str(folder) + '/' + out_dir,exist_ok=True)
+        filename = folder.joinpath(f'{out_dir}/spectral_products/{img_outlbl}Spectral_products_{sensor}_{index}_test.png')    
+        plt.tight_layout()
+        # plt.subplots_adjust(wspace=0.35)
+        plt.savefig(filename.as_posix(), dpi=400, bbox_inches='tight', pad_inches=0.1,)
+        plt.show()  
+        plt.close('all')
