@@ -455,7 +455,7 @@ def display_sat_rgb(file_name, sensor, figsize=(15, 5), title=None, ipython_mode
 
 def overlay_rgb_mdnProducts(rgb_img, model_preds, extent, img_uncert=None, product_name='Parameter',
                             figsize=(15, 5), pred_ticks= [-1, 0, 1, 2], pred_uncert_ticks = [-1, 0, 1, 2],
-                            ipython_mode=False, img_uncert_lower=None,img_uncert_upper=None,):
+                            ipython_mode=False, img_uncert_lower=None,img_uncert_upper=None,fig1=None,ax1=None):
     """
     This function can be used to overlay the MDN-prediction maps over the RGB compostite of a satellite image for display
 
@@ -516,12 +516,13 @@ def overlay_rgb_mdnProducts(rgb_img, model_preds, extent, img_uncert=None, produ
                                               "parameter at a time"
 
     'Create the basic figure and set its properties'
+
     if img_uncert is not None:
         fig1, (ax1, ax2) = plt.subplots(ncols=2, figsize=figsize, sharex=True, sharey=True)
     elif img_uncert_upper is not None and img_uncert_lower is not None: 
         fig1, (ax1, ax2, ax3) = plt.subplots(ncols=3, figsize=figsize, sharex=True, sharey=True)
     else:
-        fig1, ax1= plt.subplots(figsize=figsize)
+        if fig1 is None and ax1 is None: fig1, ax1= plt.subplots(figsize=figsize)
 
     fig1.patch.set_visible(True)
     ord = 0

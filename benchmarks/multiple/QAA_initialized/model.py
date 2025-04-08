@@ -1,5 +1,5 @@
 '''
-QAA v6 
+QAA v6, now with initialization leveraging MDN retrievals.
 http://www.ioccg.org/groups/Software_OCA/QAA_v6_2014209.pdf 
 http://www.ioccg.org/groups/Software_OCA/QAA_v6.xlsm
 
