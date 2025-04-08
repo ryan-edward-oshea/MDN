@@ -69,7 +69,13 @@ function __name__ assigned by label().
 For all functions below, y=true and y_hat=estimate
 '''
 
-
+@only_finite
+@label('N')
+def N(y, y_hat=None):
+	''' number of predictions '''
+	if y_hat is None: y_hat = y
+	return (np.isfinite(y_hat)).sum()
+	
 @only_finite
 @label('RMSE')
 def rmse(y, y_hat):
