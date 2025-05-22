@@ -43,9 +43,9 @@ update.add_argument("--seed",      default=42, type=int, help="Random seed")
 update.add_argument("--subset",    default='',           help="Comma-separated list of datasets to use when fetching data")
 #update.add_argument("--filter_ad_ag",     default=False,           help="Filters ad/ag based on fit to exponential")
 
-update.add_argument("--allow_missing",    default=False,           help="Allows a subset of wavelengths to be used")
-update.add_argument("--allow_nan_inp",    default=False,           help="Allows 0 or - Rrs")
-update.add_argument("--allow_nan_out",    default=True,            help="Allows nans in the output products")
+#update.add_argument("--allow_missing",    default=False,           help="Allows a subset of wavelengths to be used")
+#update.add_argument("--allow_nan_inp",    default=False,           help="Allows 0 or - Rrs")
+#update.add_argument("--allow_nan_out",    default=True,            help="Allows nans in the output products")
 update.add_argument("--removed_dataset",  default=None,            help="Removes specific dataset prior to training")
 update.add_argument("--min_in_out_val",   default=0,               help="Removes input/output below this value to reduce Cholesk Decomposition failure error")
 
