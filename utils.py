@@ -1,6 +1,7 @@
 from .meta import get_sensor_bands, ANCILLARY, PERIODIC
 from .parameters import update, hypers, flags, get_args
 from .__version__ import __version__
+from .compat_patch import *
 
 from collections import defaultdict as dd
 from importlib import import_module 
@@ -13,6 +14,9 @@ import numpy as np
 import xarray as xr
 import hashlib, re, warnings, functools, sys, zipfile
 import subprocess, MDN, os
+from packaging import version
+
+
 
 supported_models = {
 	'OLI': ['chl,tss,cdom', 'chl'],
@@ -209,7 +213,8 @@ class CustomUnpickler(pkl.Unpickler):
 	def find_class(self, module, name):
 		# pathlib/pickle doesn't correctly deal with instantiating
 		# a system-specific path on the opposite system (e.g. WindowsPath
-		# on a linux OS). Instead, we just provide the general Path class. 
+		# on a linux OS). Instead, we just provide the general Path class.
+		#print(name)
 		if name in ['WindowsPath', 'PosixPath']:
 			return Path 
 

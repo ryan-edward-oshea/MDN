@@ -6,17 +6,24 @@ from pathlib import Path
 from tqdm.keras import TqdmCallback
 from tqdm import trange 
 
-import numpy as np 
+import numpy as np
+from packaging import version
 import tensorflow as tf 
 import tensorflow_probability as tfp
+import random
 
 from ..transformers import IdentityTransformer
 from ..utils import read_pkl, store_pkl, ignore_warnings
 
 from .callbacks import PlottingCallback, StatsCallback, ModelCheckpoint
 from .utils import initialize_random_states, ensure_format, get_device
-from .metrics import MSA 
+from .metrics import MSA
 
+
+os.environ["TF_DETERMINISTIC_OPS"] = "1"
+tf.random.set_seed(42)
+np.random.seed(42)
+random.seed(42)
 
 class MDN:
 	''' Mixture Density Network which handles multi-output, full (symmetric) covariance.
@@ -222,11 +229,12 @@ class MDN:
 
 	@ignore_warnings
 	def fit(self, X, Y, output_slices=None, **kwargs):
-		with get_device(self.config): 
+		with get_device(self.config):
 			checkpoint = self.model_path.joinpath('checkpoint')
 
 			if checkpoint.exists() and not self.no_load:
 				if self.verbose: print(f'Restoring model weights from {checkpoint}')
+				'check for and load pre-existing model'
 				self.load()
 
 			elif self.no_load and X is None:
@@ -368,14 +376,46 @@ class MDN:
 	def save(self):
 		self.model_path.mkdir(parents=True, exist_ok=True)
 		store_pkl(self.model_path.joinpath('config.pkl'), self.get_config())
-		self.model.save_weights(self.model_path.joinpath('checkpoint'))
+		'Save version appropriate model name'
+		self.model.save(self.model_path.joinpath('trained_model.h5'))
+		"""if version.parse(tf.__version__) < version.parse("2.11.0"):
+			self.model.save_weights(self.model_path.joinpath('checkpoint'))
+		else:
+			self.model.save_weights(self.model_path.joinpath('checkpoint'), save_format="h5")"""
+
+
 
 
 	def load(self):
 		self.update_config(read_pkl(self.model_path.joinpath('config.pkl')), ['scalerx', 'scalery', 'tf_random', 'np_random'])
 		tf.random.set_global_generator(self.tf_random)
-		if not hasattr(self, 'model'): self.build()
-		self.model.load_weights(self.model_path.joinpath('checkpoint')).expect_partial()
+		'Load version appropriate model name'
+		if version.parse(tf.__version__) < version.parse("2.11.0"):
+			'Check if a tensorflow saved model in HDFs format'
+			if self.model_path.joinpath('trained_model.h5').is_file():
+				'Load Tensorflow model'
+				self.model= tf.keras.models.load_model(self.model_path.joinpath('trained_model.h5'),
+                                   custom_objects={"MixtureLayer": MixtureLayer,
+												   "loss":self.loss})
+			elif self.model_path.joinpath('checkpoint').is_file():
+				'For older trained models load model from checkpoint'
+				if not hasattr(self, 'model'): self.build()
+				self.model.load_weights(self.model_path.joinpath('checkpoint')).expect_partial()
+				'Save model as HDFS to enable processing with other tensorflow versions'
+				self.model.save(self.model_path.joinpath('trained_model.h5'))
+			else:
+				assert True, f"❌. No pre-trained Tensorflow models/checkpoints found at {self.model_path}."
+		else:
+			if self.model_path.joinpath('trained_model.h5').is_file():
+				'Load Tensorflow model'
+				self.model = tf.keras.models.load_model(self.model_path.joinpath('trained_model.h5'),
+														custom_objects={"MixtureLayer": MixtureLayer,
+																		"loss": self.loss},
+														compile=False)
+				self.model.compile(loss=self.loss, optimizer= tf.keras.optimizers.Adam(self.lr), metrics=[])
+			else:
+				assert True, f"❌. No pre-trained Tensorflow models/checkpoints found at {self.model_path}. " \
+							 f"Since we are using Tensorflow {version.parse(tf.__version__)} need a saved HDFS model."
 
 
 	def get_coefs(self, output):
@@ -453,7 +493,7 @@ class MixtureLayer(tf.keras.layers.Layer):
 
 		self.n_mix     = n_mix 
 		self.n_targets = n_targets 
-		self.epsilon   = tf.constant(epsilon)
+		self.epsilon   = float(epsilon)                                 #tf.constant(epsilon)
 		self._layer    = tf.keras.layers.Dense(self.n_outputs, **layer_kwargs)
 
 
@@ -488,3 +528,17 @@ class MixtureLayer(tf.keras.layers.Layer):
 			tf.reshape(mu,    shape=[-1, self.n_mix * self.n_targets]),
 			tf.reshape(scale, shape=[-1, self.n_mix * self.n_targets ** 2]),
 		])
+
+	# 🔑 Needed for saving/loading
+	def get_config(self):
+		config = super(MixtureLayer, self).get_config()
+		config.update({
+			"n_mix": self.n_mix,
+			"n_targets": self.n_targets,
+			"epsilon" : self.epsilon,
+		})
+		return config
+
+	@classmethod
+	def from_config(cls, config):
+		return cls(**config)

@@ -48,7 +48,7 @@ SENSOR_NAME={
 }
 
 'List variable with currently supported sensors'
-SUPPORTED_SENSORS = ['OLI', 'MSI', 'OLCI', 'S3A', 'S3B', 'HICO', 'PRISMA', 'PACE', 'PACE-sat','HYPER']
+SUPPORTED_SENSORS = ['OLI', 'MSI', 'OLCI', 'S3A', 'S3B', 'HICO', 'PRISMA', 'PACE', 'PACE-sat','HYPER', 'EMIT']
 
 def impute_data(x_train, y_train, n_neighbors=5):
     """
@@ -410,9 +410,9 @@ def get_gloria_trainTestData(sensor='HICO',  out_var=["chl", "tss", "cdom"], sav
             if train_mode:
                 'Check if variables of interest are present'
                 if (all(data['product'] == out_var)) and (data['rem_flagged'] == rem_flagged):
-                    x_train, y_train, x_test, y_test, gid = data['x_train'], data['y_train'], data['x_test'], data['y_test'], data['gid']
+                    x_train, y_train, x_test, y_test, gid_train, gid_test = data['x_train'], data['y_train'], data['x_test'], data['y_test'], data['gid_train'], data['gid_test']
 
-                    return x_train, y_train, x_test, y_test, gid
+                    return x_train, y_train, x_test, y_test, gid_train, gid_test
             else:
                 if (all(data['product'] == out_var)) and (data['rem_flagged'] == rem_flagged):
                     x_data, y_data, gid = data['x_data'], data['y_data'], data['gid']
