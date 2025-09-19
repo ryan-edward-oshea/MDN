@@ -414,8 +414,9 @@ class MDN:
 														compile=False)
 				self.model.compile(loss=self.loss, optimizer= tf.keras.optimizers.Adam(self.lr), metrics=[])
 			else:
-				assert True, f"❌. No pre-trained Tensorflow models/checkpoints found at {self.model_path}. " \
-							 f"Since we are using Tensorflow {version.parse(tf.__version__)} need a saved HDFS model."
+				assert True, f"❌. No pre-trained Tensorflow models found at {self.model_path}. " \
+							 f"Since we are using Tensorflow {version.parse(tf.__version__)} need a saved HDFS model," \
+							 f"cannot use checkpoints from old Tensorflow versions."
 
 
 	def get_coefs(self, output):
