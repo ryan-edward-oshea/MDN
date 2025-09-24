@@ -58,7 +58,7 @@ class uncertainity_estimation:
         The estimated epistemic and aleatoric variance associated with each component
         """
 
-        assert isinstance(means, np.ndarray) and isinstance(variances, np.ndarray) and isinstance(weights, np.ndarray),\
+        assert isinstance(means, np.ndarray) and isinstance(variances, np.ndarray) and isinstance(weights, np.ndarray), \
             "For now, all parameters are expected to be numpy matrices"
         'Check shape of weights matrix'
         assert len(weights.shape) == 1, "The mean variable must be a 2D matrix"
@@ -68,7 +68,7 @@ class uncertainity_estimation:
         'Check shape of means matrix'
         assert len(means.shape) == 2, "The mean variable must be a 2D matrix"
         assert (means.shape[0] == self.__nDist) and (means.shape[1] == self.__nDim), "The means variable must have " \
-                                                                                      "dimenision __nDist X __nDim"
+                                                                                     "dimenision __nDist X __nDim"
 
         'Check shape of variances matrix'
         assert len(variances.shape) == 3, "The variances variable must be a 3D matrix"
@@ -79,10 +79,11 @@ class uncertainity_estimation:
 
         'The aleatoric uncertainity: noise based uncertainity from Eqn (10) of [1]'
         if self.__nDim == 1:
-            alt_uncert = np.squeeze(np.expand_dims(weights, axis=(1,2)) * variances)
+            alt_uncert = np.squeeze(np.expand_dims(weights, axis=(1, 2)) * variances)
         else:
             weighted_var = np.expand_dims(weights, axis=(1, 2)) * variances
-            alt_uncert = np.asarray([np.diag(np.squeeze(weighted_var[ii, :, :])) for ii in range(weighted_var.shape[0])])
+            alt_uncert = np.asarray(
+                [np.diag(np.squeeze(weighted_var[ii, :, :])) for ii in range(weighted_var.shape[0])])
 
         'The epistemic uncertainity: knowledge based uncertainity from Eqn. (10) of [1]'
         eps_uncert = np.squeeze(np.square(means - np.sum(np.expand_dims(weights, axis=1) * means, axis=0)))
@@ -92,17 +93,11 @@ class uncertainity_estimation:
 
 
 if __name__ == "__main__":
-
     pi = np.array([0.21, 0.37, 0.42])
     mu = np.array([[-2.3], [1.8], [-3.1]])
-    #var = np.array([[[1,1], [1,1]], [[2,2], [2,2]], [[3,3],[3,3]]])
+    # var = np.array([[[1,1], [1,1]], [[2,2], [2,2]], [[3,3],[3,3]]])
     var = np.array([[[0.3]], [[1.2]], [[0.85]]])
 
     alt, eps = uncertainity_estimation(nDim=mu.shape[1], nDist=3).estimate_uncertainity(pi, mu, var)
 
     print('Finished')
-
-
-
-
-

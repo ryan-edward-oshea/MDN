@@ -1,8 +1,10 @@
 # Statistical, inherent Optical property (IOP)-based, muLti-conditional Inversion proceDure (SOLID)
 
-<i>"Robust algorithm for estimating total suspended solids (TSS) in inland and nearshore coastal waters". S.V. Balasubramanian, et al. (2020).</i>
+<i>"Robust algorithm for estimating total suspended solids (TSS) in inland and nearshore coastal waters". S.V.
+Balasubramanian, et al. (2020).</i>
 
 ### Usage
+
 This package should first be cloned with the MDN library as a whole:
 
 `git clone https://github.com/BrandonSmithJ/MDN`
@@ -10,6 +12,7 @@ This package should first be cloned with the MDN library as a whole:
 <br>
 
 SOLID may be used to estimate TSS for the missions:
+
 - Landsat-8 (OLI)
 - Sentinel-2 (MSI)
 - Sentinel-3 (OLCI)
@@ -17,6 +20,7 @@ SOLID may be used to estimate TSS for the missions:
 - Terra/Aqua (MOD)
 
 The following code snippet shows how to use SOLID:
+
 ```
 # sensor = "<OLI, MSI, VI, OLCI, MOD>"
 # Rrs    = "<Your remote sensing reflectance [1/sr] data, shaped [N samples, N wavelengths]>"

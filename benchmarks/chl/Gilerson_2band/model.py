@@ -15,12 +15,13 @@ fluence of CDOM and SPM is no longer valid under these conditions.
 
 from ...utils import get_required, optimize
 
+
 @optimize(['a', 'b'])
 def model(Rrs, wavelengths, *args, **kwargs):
-	required = [665, 708]
-	tol = kwargs.get('tol', 5)
-	Rrs = get_required(Rrs, wavelengths, required, tol)
+    required = [665, 708]
+    tol = kwargs.get('tol', 5)
+    Rrs = get_required(Rrs, wavelengths, required, tol)
 
-	a = kwargs.get('a', 0.022)
-	b = kwargs.get('b', 0.8897)
-	return ((0.7864 / a) * (Rrs(708) / Rrs(665)) - (0.4245 / a)) ** (1/b)
+    a = kwargs.get('a', 0.022)
+    b = kwargs.get('b', 0.8897)
+    return ((0.7864 / a) * (Rrs(708) / Rrs(665)) - (0.4245 / a)) ** (1 / b)

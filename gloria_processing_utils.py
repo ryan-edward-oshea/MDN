@@ -7,14 +7,16 @@ Description:    This code file will be used to hand the samples from the GLORIA 
 Date Created:   August 29th, 2022
 """
 
+import re
+import warnings
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
-import re
-from pathlib import Path
-from tqdm import tqdm
-from sklearn.model_selection import train_test_split
 from sklearn.impute import KNNImputer
-import warnings
+from sklearn.model_selection import train_test_split
+from tqdm import tqdm
+
 warnings.filterwarnings(action="ignore")
 
 from .parameters import get_args
@@ -23,32 +25,31 @@ from .Rrs_manipulation.resample import resample, read
 from .product_estimation import image_estimates
 
 import os
+
 this_dir, this_filename = os.path.split(__file__)
 SRF_FOLDER = os.path.join(this_dir, "Rrs_manipulation", "Rsr")
 
-
 'Create a dicitonary variable with the short string identifiers and column names of various parameters of interest'
-GLORIA_VARIABLE_LOOKUP= {
-    'chl': 'Chla',                  # Chlorophyll-s
-    'tss': 'TSS',                   # Total Suspended Solids
-    'cdom': 'aCDOM440',             # colored DISSOLVED ORGANIC MATERIALS
-    'secchi': 'Secchi_depth',       # Secchi Disc Depth
-    'pc': 'PC',                     # Phyco-cyanin
-    'lat': 'Latitude',              # Latitude of the sample
-    'lon': 'Longitude'              # Longitude of the sample
+GLORIA_VARIABLE_LOOKUP = {
+    'chl': 'Chla',  # Chlorophyll-s
+    'tss': 'TSS',  # Total Suspended Solids
+    'cdom': 'aCDOM440',  # colored DISSOLVED ORGANIC MATERIALS
+    'secchi': 'Secchi_depth',  # Secchi Disc Depth
+    'pc': 'PC',  # Phyco-cyanin
+    'lat': 'Latitude',  # Latitude of the sample
+    'lon': 'Longitude'  # Longitude of the sample
 }
-
-
 
 GLORIA_WQI_IOP = ['chl', 'tss', 'cdom', 'secchi', 'pc', 'lat', 'lon', 'aph', 'ad', 'ag', 'bbp', 'salinity']
 
-SENSOR_NAME={
-    "OLCI":"OLCI",
+SENSOR_NAME = {
+    "OLCI": "OLCI",
     "VI": "VIIRS"
 }
 
 'List variable with currently supported sensors'
-SUPPORTED_SENSORS = ['OLI', 'MSI', 'OLCI', 'S3A', 'S3B', 'HICO', 'PRISMA', 'PACE', 'PACE-sat','HYPER', 'EMIT']
+SUPPORTED_SENSORS = ['OLI', 'MSI', 'OLCI', 'S3A', 'S3B', 'HICO', 'PRISMA', 'PACE', 'PACE-sat', 'HYPER', 'EMIT']
+
 
 def impute_data(x_train, y_train, n_neighbors=5):
     """
@@ -84,12 +85,12 @@ def impute_data(x_train, y_train, n_neighbors=5):
     imputer = KNNImputer(n_neighbors=n_neighbors)
     X = imputer.fit_transform(X)
 
-    n_dim = (-1 *y_train.shape[1])
+    n_dim = (-1 * y_train.shape[1])
     return X[:, :n_dim], X[:, n_dim:]
 
 
 def resample_Rrs(rrs_data, wvl_in, srf_folder=Path(SRF_FOLDER),
-                    sensor="OLCI"):
+                 sensor="OLCI"):
     """
     This function is designed to resample the hyperspectral measurements available in the Augmented GLORIA dataset to
     the spectral resolution of a specific sensor
@@ -159,13 +160,14 @@ def resample_Rrs(rrs_data, wvl_in, srf_folder=Path(SRF_FOLDER),
 
     return rrs_data_resamp, wvl_out
 
+
 def get_gloria_samples(sensor="OLCI", bg_var=['chl', 'tss', 'cdom'],
                        gloria_folder=Path("/Volumes/AMS_HDD/Spectral Data/Augmented_Gloria_V3.2/"),
                        rrs_name='AG_Rrs.csv',
                        bg_name='AG_meta_and_lab.csv',
                        flag_name='AugGLORIA_qc_flags.csv',
                        srf_folder=Path('/Users/arunsaranathan/SSAI/Code/Rrs_manipulation/Rsr'),
-                       gloria_only = False,
+                       gloria_only=False,
                        rem_flagged=False,
                        pc_name='AG_Conc_PC.csv'
                        ):
@@ -236,7 +238,7 @@ def get_gloria_samples(sensor="OLCI", bg_var=['chl', 'tss', 'cdom'],
         assert flag_loc.is_file(), f"No file found at: {str(flag_loc)}"
     assert isinstance(gloria_only, bool), "The <gloria_only> variable must be Boolean"
     if 'pc' in bg_var:
-        pc_location= gloria_folder.joinpath(pc_name)
+        pc_location = gloria_folder.joinpath(pc_name)
         assert pc_location.is_file(), f"Cannot find file with PC concentrations at:{pc_location}"
 
     '------------------------------------------------------------------------------------------------------------------'
@@ -256,8 +258,8 @@ def get_gloria_samples(sensor="OLCI", bg_var=['chl', 'tss', 'cdom'],
     'Get sample spectra'
     wvl_in = wvl_in[1:-1]
     rrs_data = np.asarray(rrs_data[wvl_in], dtype=float)
-    wvl_in =  np.asarray([int(re.findall(r'\d+', item)[0]) for item in wvl_in])
-    #rrs_data = np.asarray(rrs_data, dtype=float)[:, 1:-1]
+    wvl_in = np.asarray([int(re.findall(r'\d+', item)[0]) for item in wvl_in])
+    # rrs_data = np.asarray(rrs_data, dtype=float)[:, 1:-1]
 
     'Resample the spectral samples in augmented gloria according to the sensor of interest'
     rrs_resamp, wvl_out = resample_Rrs(rrs_data, wvl_in, sensor=sensor, srf_folder=srf_folder)
@@ -281,8 +283,7 @@ def get_gloria_samples(sensor="OLCI", bg_var=['chl', 'tss', 'cdom'],
         if gloria_only:
             pc_data = pc_data.loc[bg_data['GLORIA_ID'].str.startswith('GID', na=False)]
 
-        bg_data_sel = np.hstack((bg_data_sel, np.asarray(pc_data.iloc[:, 1]).reshape((-1,1))))
-
+        bg_data_sel = np.hstack((bg_data_sel, np.asarray(pc_data.iloc[:, 1]).reshape((-1, 1))))
 
     assert rrs_resamp.shape[0] == bg_data_sel.shape[0], f"SHAPE MISMATCH! Got {bg_data_sel.shape[0]} IOPs for " \
                                                         f"{rrs_resamp.shape[0]} samples"
@@ -292,7 +293,7 @@ def get_gloria_samples(sensor="OLCI", bg_var=['chl', 'tss', 'cdom'],
         if gloria_only:
             gloria_flags = gloria_flags.loc[gloria_flags['GLORIA_ID'].str.startswith('GID', na=False)]
         gloria_flags = np.asarray(gloria_flags.iloc[:, 1:3], dtype=np.float32)
-        gloria_flags = np.asarray(1- np.nanmax(gloria_flags, axis=1), dtype=bool)
+        gloria_flags = np.asarray(1 - np.nanmax(gloria_flags, axis=1), dtype=bool)
 
         rrs_resamp = rrs_resamp[gloria_flags, :]
         bg_data_sel = bg_data_sel[gloria_flags, :]
@@ -300,13 +301,14 @@ def get_gloria_samples(sensor="OLCI", bg_var=['chl', 'tss', 'cdom'],
 
     return rrs_resamp, bg_data_sel, gid
 
-def get_gloria_trainTestData(sensor='HICO',  out_var=["chl", "tss", "cdom"], save_flag=False, load_exists=True,
-                             rand_seed =42, rem_flagged=True, impute_flag=False,
-                             gloria_folder = Path("/Volumes/AMS_HDD/Spectral Data/Augmented_Gloria_V2"),
+
+def get_gloria_trainTestData(sensor='HICO', out_var=["chl", "tss", "cdom"], save_flag=False, load_exists=True,
+                             rand_seed=42, rem_flagged=True, impute_flag=False,
+                             gloria_folder=Path("/Volumes/AMS_HDD/Spectral Data/Augmented_Gloria_V2"),
                              flag_name='GLORIA_qc_flags.csv', rrs_name='GLORIA_Rrs.csv',
                              bg_name='GLORIA_meta_and_lab.csv',
-                             save_folder = Path("/uncert_hyper_experiments_t2/data_extraction/data_products"),
-                             save_name= "trainTest", gloria_only=False, pc_name='AG_Conc_PC.csv',
+                             save_folder=Path("/uncert_hyper_experiments_t2/data_extraction/data_products"),
+                             save_name="trainTest", gloria_only=False, pc_name='AG_Conc_PC.csv',
                              srf_folder=Path(SRF_FOLDER),
                              train_mode=True):
     """
@@ -410,7 +412,8 @@ def get_gloria_trainTestData(sensor='HICO',  out_var=["chl", "tss", "cdom"], sav
             if train_mode:
                 'Check if variables of interest are present'
                 if (all(data['product'] == out_var)) and (data['rem_flagged'] == rem_flagged):
-                    x_train, y_train, x_test, y_test, gid_train, gid_test = data['x_train'], data['y_train'], data['x_test'], data['y_test'], data['gid_train'], data['gid_test']
+                    x_train, y_train, x_test, y_test, gid_train, gid_test = data['x_train'], data['y_train'], data[
+                        'x_test'], data['y_test'], data['gid_train'], data['gid_test']
 
                     return x_train, y_train, x_test, y_test, gid_train, gid_test
             else:
@@ -419,25 +422,21 @@ def get_gloria_trainTestData(sensor='HICO',  out_var=["chl", "tss", "cdom"], sav
 
                     return x_data, y_data, gid
 
-
-
-
     'It not a pre-loaded one get the data'
     x_data, y_data, gid = get_gloria_samples(sensor=sensor, bg_var=out_var, gloria_folder=gloria_folder,
-                                        rrs_name=rrs_name, bg_name=bg_name, rem_flagged=rem_flagged,
-                                        gloria_only=gloria_only, pc_name=pc_name, srf_folder=srf_folder,
-                                        flag_name=flag_name,)
-
+                                             rrs_name=rrs_name, bg_name=bg_name, rem_flagged=rem_flagged,
+                                             gloria_only=gloria_only, pc_name=pc_name, srf_folder=srf_folder,
+                                             flag_name=flag_name, )
 
     'Replace nan Rrs by 0'
     x_data = np.nan_to_num(x_data)
-    x_data[x_data <= 1.e-6]= 1e-6
-    y_data[y_data <= 1.e-6]= np.nan
+    x_data[x_data <= 1.e-6] = 1e-6
+    y_data[y_data <= 1.e-6] = np.nan
 
     'Split into training and test data'
     if train_mode:
-        x_train, x_test, y_train, y_test, gid_train, gid_test = train_test_split(x_data, y_data, gid, test_size=0.5, random_state=rand_seed)
-
+        x_train, x_test, y_train, y_test, gid_train, gid_test = train_test_split(x_data, y_data, gid, test_size=0.5,
+                                                                                 random_state=rand_seed)
 
     'Impute missing values --- STATIC GOLD STANDARD'
     if impute_flag:
@@ -458,7 +457,6 @@ def get_gloria_trainTestData(sensor='HICO',  out_var=["chl", "tss", "cdom"], sav
             np.savez_compressed(base_address, x_data=x_data, y_data=y_data, product=out_var,
                                 rem_flagged=rem_flagged, gid=gid)
 
-
     if train_mode:
         return x_train, y_train, x_test, y_test, gid_train, gid_test
     else:
@@ -467,7 +465,7 @@ def get_gloria_trainTestData(sensor='HICO',  out_var=["chl", "tss", "cdom"], sav
 
 if __name__ == "__main__":
     "To test the functionality set the gloria location as the folder with the unzipped GLORIA data"
-    gloria_folder= Path("C:\\Users\\asaranat\\OneDrive - NASA\\Code\\oceanOptics_tutorials\\data\\GLORIA_2022\\")
+    gloria_folder = Path("C:\\Users\\asaranat\\OneDrive - NASA\\Code\\oceanOptics_tutorials\\data\\GLORIA_2022\\")
     x_data, y_data, gid_data = get_gloria_trainTestData(sensor='OLCI', out_var=["chl", "tss", "cdom"],
                                                         save_flag=False, load_exists=False, rand_seed=42,
                                                         rem_flagged=True, gloria_folder=gloria_folder,

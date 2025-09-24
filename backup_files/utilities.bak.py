@@ -8,21 +8,21 @@ Date Created:   September 2nd, 2024
 """
 
 import numpy as np
-import sys
-from tqdm import tqdm
 from tqdm import tqdm
 
-from .product_estimation import get_estimates
-from .parameters import get_args
-from .meta import get_sensor_bands
-from .utils import mask_land
-from .uncertainty_package_final.uncert_support_lib import get_sample_uncertainity
+from MDN.meta import get_sensor_bands
+from MDN.parameters import get_args
+from MDN.product_estimation import get_estimates
+from MDN.uncertainty_package_final.uncert_support_lib import get_sample_uncertainity
+from MDN.utils import mask_land
 
 'Base properties for imshow'
 ASPECT = 'auto'
 cmap = 'jet'
 
-def get_mdn_preds(test_x, args=None, sensor="OLCI", products="chl", mode="point", model_type='production', verbose=False):
+
+def get_mdn_preds(test_x, args=None, sensor="OLCI", products="chl", mode="point", model_type='production',
+                  verbose=False):
     """
     This function is used to generate estimates from pre-trained MDN
 
@@ -49,8 +49,8 @@ def get_mdn_preds(test_x, args=None, sensor="OLCI", products="chl", mode="point"
         b) op_slices: A dictionary indicating the slices corresponding to the different output variables.
     """
 
-    assert  model_type in ['production', 'testing'], f"Currently the toolbox only supports two model types" \
-                                                     f" 'production' and 'testing'. Instead got '{model_type}'."
+    assert model_type in ['production', 'testing'], f"Currently the toolbox only supports two model types" \
+                                                    f" 'production' and 'testing'. Instead got '{model_type}'."
 
     if args == None:
         print("MDN model settings not provided by user!")
@@ -112,7 +112,7 @@ def get_mdn_preds(test_x, args=None, sensor="OLCI", products="chl", mode="point"
 
     'Get the predictions if the model does not exist the toolbox will throw up an error'
     if test_x is not None:
-        outputs, op_slices = get_estimates(args, x_test=test_x, return_coefs=True,)
+        outputs, op_slices = get_estimates(args, x_test=test_x, return_coefs=True, )
 
     'Return prodcuts based on user requirement'
     if mode == 'full':
@@ -120,8 +120,8 @@ def get_mdn_preds(test_x, args=None, sensor="OLCI", products="chl", mode="point"
     else:
         return np.median(outputs['estimates'], axis=0), op_slices
 
-
     print('finished')
+
 
 def arg_median(X, axis=0):
     """
@@ -180,7 +180,6 @@ def get_mdn_uncert_ensemble(ensmeble_distribution, estimates, scaler_y_list, sca
     A list containing the uncertainties for the entire ensemble set
     """
 
-
     assert scaler_mode in ["invert", "non_invert"], f"Only two available options for <scaler_mode> are 'invert' and" \
                                                     f"'non_invert"
 
@@ -188,7 +187,7 @@ def get_mdn_uncert_ensemble(ensmeble_distribution, estimates, scaler_y_list, sca
     est_med_loc = arg_median(estimates, axis=0)
 
     'Create a variable to hold the uncertainties'
-    ensmeble_uncertainties= []
+    ensmeble_uncertainties = []
     'create a counter to track model number'
     ctr = 0
 
@@ -220,8 +219,8 @@ def get_mdn_uncert_ensemble(ensmeble_distribution, estimates, scaler_y_list, sca
     'If needed invert the variance'
     estimates[~np.isfinite(estimates)] = 1e-6
     if scaler_mode == "invert":
-        lim1 = np.asarray(scaler_y.transform(np.median(estimates+1e-6, axis=0))) - np.asarray(final_uncertainties)
-        lim2 = np.asarray(scaler_y.transform(np.median(estimates+1e-6, axis=0))) + np.asarray(final_uncertainties)
+        lim1 = np.asarray(scaler_y.transform(np.median(estimates + 1e-6, axis=0))) - np.asarray(final_uncertainties)
+        lim2 = np.asarray(scaler_y.transform(np.median(estimates + 1e-6, axis=0))) + np.asarray(final_uncertainties)
 
         sd = np.squeeze(1 * (scaler_y.inverse_transform(lim2) - scaler_y.inverse_transform(lim1)))
 
@@ -229,9 +228,10 @@ def get_mdn_uncert_ensemble(ensmeble_distribution, estimates, scaler_y_list, sca
     else:
         return np.asarray(final_uncertainties)
 
+
 def map_cube_old(img_data, wvl_bands, sensor, products='chl,tss,cdom', land_mask=False, landmask_threshold=0.0,
-             flg_subsmpl=False, subsmpl_rate=10, flg_uncert=False, slices=None, scaler_mode="invert",
-             block_size=10000):
+                 flg_subsmpl=False, subsmpl_rate=10, flg_uncert=False, slices=None, scaler_mode="invert",
+                 block_size=10000):
     """
     This function is used tomap the pixels in a 3D numpy array, in terms of both parameters and the associated
     model uncertainty.
@@ -344,8 +344,8 @@ def map_cube_old(img_data, wvl_bands, sensor, products='chl,tss,cdom', land_mask
     if any(sensor_bands != wvl_bands):
         valid_bands = []
         for item in sensor_bands:
-            assert np.min(np.abs(np.asarray(wvl_bands) - item))<=5, f"The bands provided-{wvl_bands} do not " \
-                                                                       f"agree with the sensor bands {sensor_bands}"
+            assert np.min(np.abs(np.asarray(wvl_bands) - item)) <= 5, f"The bands provided-{wvl_bands} do not " \
+                                                                      f"agree with the sensor bands {sensor_bands}"
             valid_bands += [np.argmin(np.abs(np.asarray(wvl_bands) - item))]
 
     'Only selecting the valid bands for this model'
@@ -507,7 +507,7 @@ def map_cube(img_data, wvl_bands, sensor, products='chl,tss,cdom', land_mask=Fal
                                                                      f"positive integer"
 
     assert uncert_mode in ["bound", "composite"], f"Only two available options for <scaler_mode> are 'bound' and" \
-                                                    f"'composite'. Instead got '{uncert_mode}'"
+                                                  f"'composite'. Instead got '{uncert_mode}'"
 
     'Get/set the default arguments for the MDN for mapping'
     kwargs = {'product': products,
@@ -556,12 +556,12 @@ def map_cube(img_data, wvl_bands, sensor, products='chl,tss,cdom', land_mask=Fal
     args = get_args(kwargs, use_cmdline=False)
 
     'Compare the model bands to the available bands '
-    sensor_bands = get_sensor_bands(args.sensor,args=args)
+    sensor_bands = get_sensor_bands(args.sensor, args=args)
     if any(sensor_bands != wvl_bands):
         valid_bands = []
         for item in sensor_bands:
-            assert np.min(np.abs(np.asarray(wvl_bands) - item))<=5, f"The bands provided-{wvl_bands} do not " \
-                                                                       f"agree with the sensor bands {sensor_bands}"
+            assert np.min(np.abs(np.asarray(wvl_bands) - item)) <= 5, f"The bands provided-{wvl_bands} do not " \
+                                                                      f"agree with the sensor bands {sensor_bands}"
             valid_bands += [np.argmin(np.abs(np.asarray(wvl_bands) - item))]
     else:
         valid_bands = ~np.isnan(wvl_bands)
@@ -650,8 +650,10 @@ def map_cube(img_data, wvl_bands, sensor, products='chl,tss,cdom', land_mask=Fal
 
         'If inversion is needed -- first find the upper and lower bounds of each estimate space using the '
         scaler_y = outputs['scalery'][0]
-        upper_uncert = scaler_y.inverse_transform(np.asarray(scaler_y.transform(final_estimates)) + np.asarray(final_uncertainties))
-        lower_uncert = scaler_y.inverse_transform(np.asarray(scaler_y.transform(final_estimates)) - np.asarray(final_uncertainties))
+        upper_uncert = scaler_y.inverse_transform(
+            np.asarray(scaler_y.transform(final_estimates)) + np.asarray(final_uncertainties))
+        lower_uncert = scaler_y.inverse_transform(
+            np.asarray(scaler_y.transform(final_estimates)) - np.asarray(final_uncertainties))
 
         if uncert_mode == "bound":
             'Define the upper bound images'

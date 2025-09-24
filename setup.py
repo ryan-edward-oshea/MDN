@@ -1,5 +1,7 @@
+from pathlib import Path
+
 from setuptools import setup
-from pathlib import Path 
+
 from __version__ import __version__
 
 # We can't reference the local requirements file within itself,
@@ -8,7 +10,7 @@ from __version__ import __version__
 # the requirements file. 
 # Instead, we can reference the local path here, and parse the requirements
 with Path(__file__).parent.joinpath('requirements_old.txt').open() as f:
-	requirements = [line.strip() for line in f.readlines()]
+    requirements = [line.strip() for line in f.readlines()]
 
 setup(
     name='MDN',

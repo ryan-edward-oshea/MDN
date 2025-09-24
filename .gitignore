@@ -9,6 +9,7 @@ Cache
 # Development files
 Development
 Weights_*
+backup_files/
 map_files
 toy*
 **/*_skip_*

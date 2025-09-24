@@ -15,14 +15,15 @@ lakes in Japan and China
 
 from ...utils import get_required, optimize
 
+
 @optimize(['a', 'b'])
 def model(Rrs, wavelengths, *args, **kwargs):
-	required = [665, 708, 753]
-	tol = kwargs.get('tol', 5)
-	Rrs = get_required(Rrs, wavelengths, required, tol)
+    required = [665, 708, 753]
+    tol = kwargs.get('tol', 5)
+    Rrs = get_required(Rrs, wavelengths, required, tol)
 
-	a = kwargs.get('a', 161.24)
-	b = kwargs.get('b', 28.04)
+    a = kwargs.get('a', 161.24)
+    b = kwargs.get('b', 28.04)
 
-	index = ((1/Rrs(665) - 1/Rrs(708)) / (1/Rrs(753) - 1/Rrs(708)))
-	return a * index + b
+    index = ((1 / Rrs(665) - 1 / Rrs(708)) / (1 / Rrs(753) - 1 / Rrs(708)))
+    return a * index + b

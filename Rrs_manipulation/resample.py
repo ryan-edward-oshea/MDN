@@ -1,15 +1,16 @@
 # from scipy.interpolate import Akima1DInterpolator as Akima
-from scipy.interpolate import CubicSpline as Akima
+import os
 
-from tqdm import tqdm
-import pandas as pd 
 import numpy as np
-import os 
+import pandas as pd
+from scipy.interpolate import CubicSpline as Akima
+from tqdm import tqdm
 
 '''
 rsr funcs:
 https://oceancolor.gsfc.nasa.gov/docs/rsr/
 '''
+
 
 def read(filename):
     if 'CCNY' in filename:
@@ -25,71 +26,71 @@ def read(filename):
         data = data.apply(pd.to_numeric, errors='coerce').to_numpy()
     return data
 
+
 def resample(rsr, rsr_idx, data, data_idx, W):
     valid = np.isfinite(data)
     if data_idx[valid].size:
-        idx_pairs = np.where(np.diff(np.hstack(([False],np.diff(data_idx[valid])<5,[False]))))[0].reshape(-1,2)
+        idx_pairs = np.where(np.diff(np.hstack(([False], np.diff(data_idx[valid]) < 5, [False]))))[0].reshape(-1, 2)
         if idx_pairs.size:
-            start_longest_seq = idx_pairs[np.diff(idx_pairs,axis=1).argmax(),0]
-            end_longest_seq = idx_pairs[np.diff(idx_pairs,axis=1).argmax(),1]
-            if data_idx[valid][end_longest_seq] - data_idx[valid][start_longest_seq]  < 50:
+            start_longest_seq = idx_pairs[np.diff(idx_pairs, axis=1).argmax(), 0]
+            end_longest_seq = idx_pairs[np.diff(idx_pairs, axis=1).argmax(), 1]
+            if data_idx[valid][end_longest_seq] - data_idx[valid][start_longest_seq] < 50:
                 start_longest_seq = -1
                 end_longest_seq = -1
         else:
             start_longest_seq = -1
             end_longest_seq = -1
-        j=-1
-        valid_hyp=[]
-        for i,valid_i in enumerate(valid):
+        j = -1
+        valid_hyp = []
+        for i, valid_i in enumerate(valid):
             if valid_i:
-                j=j+1
-            if j >=start_longest_seq and j <=end_longest_seq:
+                j = j + 1
+            if j >= start_longest_seq and j <= end_longest_seq:
                 valid_hyp.append(valid_i)
             else:
                 valid_hyp.append(False)
         # print(np.shape(valid),np.shape(valid_hyp))
-        valid=np.asarray(valid_hyp)
+        valid = np.asarray(valid_hyp)
         # print(data_idx[valid])
-        #valid = np.asarray([ valid_i if i >=start_longest_seq and i <=end_longest_seq else False  for i,valid_i in enumerate(valid) ])
+        # valid = np.asarray([ valid_i if i >=start_longest_seq and i <=end_longest_seq else False  for i,valid_i in enumerate(valid) ])
     if valid.sum() and data_idx[valid].size:
         min_avail = data_idx[valid].min()
         max_avail = data_idx[valid].max()
         # finds the longest chain of consecutive numbers, uses these as new valid range
-        
+
         # print(valid,sum(valid),data_idx[valid], data[valid])
         # if np.max(np.diff(data_idx[valid]))>10:
         #     print("DATA IS NOT HYPERSPECTRAL",data_idx[valid],np.max(np.diff(data_idx[valid])))
 
+        if sum(valid) > 1:
+            # Breaks the loop if the data is not hyperspectral...
 
-        if sum(valid)>1:
-            #Breaks the loop if the data is not hyperspectral...
-            
-            interp    = Akima(data_idx[valid], data[valid])
-            averaged  = []
-            for band in range(len(rsr)):                
-                curr_rsr  = rsr[band]
-                curr_idx  = rsr_idx[band]
+            interp = Akima(data_idx[valid], data[valid])
+            averaged = []
+            for band in range(len(rsr)):
+                curr_rsr = rsr[band]
+                curr_idx = rsr_idx[band]
                 if (curr_rsr[(curr_idx >= min_avail) & (curr_idx <= max_avail)].sum() / curr_rsr.sum()) > 0.9:
                     averaged.append(np.nansum(interp(curr_idx) * curr_rsr * W[band]) / np.nansum(curr_rsr * W[band]))
                 else:
-                    averaged.append(np.nan)        
+                    averaged.append(np.nan)
             return averaged
     return [np.nan for band in range(len(rsr))]
+
 
 def create(name, folder, sensor, LUT, filtered=False, use_f0=False, square=False):
     # sensor   = 'S2B'
     # LUT      = True  # Create training data (LUT) or testing data (in situ)
     # filtered = False  # Create filtered dataset for LUT based on QAA bbp error
 
-
-    if LUT:    
+    if LUT:
         # folder  = 'Train/Generated' 
         # name    = 'Rrs'
         hyp_idx = read('%s/HYP_wavelengths' % folder)
         hyp_val = read('%s/HYP/%s.csv' % (folder, name))
         if hyp_val.shape[0] < hyp_val.shape[1]:
             hyp_val = hyp_val.T
-        assert(hyp_val.shape[1] == len(hyp_idx)), [hyp_val.shape, hyp_idx.shape]
+        assert (hyp_val.shape[1] == len(hyp_idx)), [hyp_val.shape, hyp_idx.shape]
         # valid = hyp_idx <= 715
         # hyp_idx = hyp_idx[valid]
         # hyp_val = hyp_val[:, valid]
@@ -105,15 +106,15 @@ def create(name, folder, sensor, LUT, filtered=False, use_f0=False, square=False
             print('Keeping %s / %s LUT samples after filter' % (keep.sum(), hyp_val.shape[0]))
             hyp_val = hyp_val[keep]
 
-    else:     
+    else:
         # folder  = 'Train/IOCCG'
         # folder  = 'Test/Full'
         # name    = 'a_p'
-        insitu  = read('%s/HYP/%s.csv' % (folder, name))
+        insitu = read('%s/HYP/%s.csv' % (folder, name))
         hyp_idx = insitu[0]
         hyp_val = insitu[1:]
         # hyp_val[np.isnan(hyp_val)] = 0
-        assert(hyp_idx[0] >= 100), hyp_idx[0]
+        assert (hyp_idx[0] >= 100), hyp_idx[0]
         # hyp_val[np.isnan(hyp_val)] = 0
         # hyp_idx_lut = read('Train/Full/HYP_wavelengths')
         # valid = np.logical_and(hyp_idx_lut >= hyp_idx.min(), hyp_idx_lut <= hyp_idx.max())
@@ -128,17 +129,17 @@ def create(name, folder, sensor, LUT, filtered=False, use_f0=False, square=False
 
     nLw = False
     if name == 'nLw':
-        f0   = np.loadtxt('/home/ryanoshea/in_situ_database/Working_in_situ_dataset/IOP/f0.txt', delimiter=',')
-        nLw  = True
+        f0 = np.loadtxt('/home/ryanoshea/in_situ_database/Working_in_situ_dataset/IOP/f0.txt', delimiter=',')
+        nLw = True
         name = 'Rrs'
 
     rsr = read('Rsr/%s_rsr.csv' % sensor)
     rsr[np.isnan(rsr)] = 0
-    rsr[rsr < -50] = 0 # Some sheets have e.g. -999 as a placeholder
+    rsr[rsr < -50] = 0  # Some sheets have e.g. -999 as a placeholder
 
     bands = rsr[0, 1:]
     waves = rsr[1:, 0]
-    rsr   = rsr[1:,1:]
+    rsr = rsr[1:, 1:]
 
     if square:
         # https://oceancolor.gsfc.nasa.gov/docs/ocssw/atmocor2_8c_source.html
@@ -157,14 +158,14 @@ def create(name, folder, sensor, LUT, filtered=False, use_f0=False, square=False
         # rsr = np.logical_and((bands.round()-5)[None,:] <= waves[:, None], waves[:, None] <= (bands.round()+5)[None,:]).astype(float) # S2
 
     # Rsr can extend past available hyperspectral data
-    valid  = np.logical_and(waves <= hyp_idx.max(), waves >= hyp_idx.min())
+    valid = np.logical_and(waves <= hyp_idx.max(), waves >= hyp_idx.min())
     # remove = np.any(rsr[~valid] > 0, axis=0)             # No part of rsr can lie outside
-    remove = (rsr[~valid].sum(0) / rsr.sum(0)) > 0.1     # Less than 10% of rsr can lie outside 
-    
+    remove = (rsr[~valid].sum(0) / rsr.sum(0)) > 0.1  # Less than 10% of rsr can lie outside
+
     print('Bands with responses outside of range [%s, %s]: \n' % (hyp_idx.min(), hyp_idx.max()), list(bands[remove]))
     bands = bands[~remove]
     waves = waves[valid]
-    rsr   = rsr[:, ~remove][valid]
+    rsr = rsr[:, ~remove][valid]
     print('\nCreating data for bands\n', list(bands))
     if not len(bands): return
 
@@ -185,9 +186,9 @@ def create(name, folder, sensor, LUT, filtered=False, use_f0=False, square=False
         for d in tqdm(hyp_val):
             vals = resample(rsr_val, rsr_idx, d, hyp_idx, W)
             if nLw:
-                vals = [v/f for v,f in zip(vals, resample(rsr_val, rsr_idx, f0[:,1], f0[:,0], W))]
+                vals = [v / f for v, f in zip(vals, resample(rsr_val, rsr_idx, f0[:, 1], f0[:, 0], W))]
             if square:
-                assert(sensor == 'OLI')
+                assert (sensor == 'OLI')
                 nlw = np.array(vals[:4]) * full_f0
                 ratio = nlw[1] / nlw[2]
                 x = (a2 * ratio + a1) * ratio + a0
@@ -198,38 +199,40 @@ def create(name, folder, sensor, LUT, filtered=False, use_f0=False, square=False
 
 
 if __name__ == '__main__':
-    from glob import glob 
+    from glob import glob
+
     # sensors = ['OLI','PACE','HICO','PRISMA','OLCI','HYPER']
     sensors = ['OLCI', 'MSI']
-    #sensors = ['OLI', 'S2B', 'S2A', 'MSI', 'VI', 'OLCI', 'MODA', 'MODT', 'HICO', 'TM', 'ETM']
-    #sensors += ['HICO', 'MOS', 'ETM800', 'TM', 'ETM', 'CZCS', 'OCTS', 'MERIS', 'SeaWiFS', 'PRISMA','S3A','S3B']
-    root    = 'Test'
+    # sensors = ['OLI', 'S2B', 'S2A', 'MSI', 'VI', 'OLCI', 'MODA', 'MODT', 'HICO', 'TM', 'ETM']
+    # sensors += ['HICO', 'MOS', 'ETM800', 'TM', 'ETM', 'CZCS', 'OCTS', 'MERIS', 'SeaWiFS', 'PRISMA','S3A','S3B']
+    root = 'Test'
     rewrite = True
-    square  = False 
+    square = False
     base_folder = 'C:\\Users\\asaranat\\OneDrive - NASA\\Data\\spectral_data\\Augmented_Gloria_V3_3\\'
     datasets = sorted(os.listdir(base_folder))
-    #datasets = ['DutchLakes']
-    folders = [f'{base_folder}{f}' for f in datasets if os.path.isdir(f'{base_folder}{f}' )]
+    # datasets = ['DutchLakes']
+    folders = [f'{base_folder}{f}' for f in datasets if os.path.isdir(f'{base_folder}{f}')]
     print(folders)
     input('Hold')
     import traceback
+
     for sensor in sensors:
         for folder in folders:
             print('\n---', folder, '-', sensor, '---')
             try:
                 print(glob(os.path.join(folder, 'HYP', '*.csv')))
-                #input('HOLD')
+                # input('HOLD')
                 for f in glob(os.path.join(folder, 'HYP', '*.csv')):
                     f = os.path.basename(f).replace('.csv', '')
                     if '_old' in f: continue
-    
-                    print('\t---',f,os.path.exists(os.path.join(folder, sensor, f'{f}.csv')) )
+
+                    print('\t---', f, os.path.exists(os.path.join(folder, sensor, f'{f}.csv')))
                     if not os.path.exists(os.path.join(folder, sensor, f'{f}.csv')) or rewrite:
                         print('Creating')
                         create(f, folder, LUT='Train' in folder, sensor=sensor, square=square)
             except Exception as e:
                 # print(f"Failure to process due to error: {e}")
                 print(f'Failure to process due to error:  {e}\n{traceback.format_exc()}')
-                print('folder',folder)
+                print('folder', folder)
                 input('Waiting to acknowledge error')
 #

@@ -9,12 +9,13 @@ SPM and CDOM and R rs (753) is mainly driven by backscattering).
 
 from ...utils import get_required, optimize
 
+
 @optimize(['a', 'b'])
 def model(Rrs, wavelengths, *args, **kwargs):
-	required = [665, 708, 753]
-	tol = kwargs.get('tol', 5)
-	Rrs = get_required(Rrs, wavelengths, required, tol)
+    required = [665, 708, 753]
+    tol = kwargs.get('tol', 5)
+    Rrs = get_required(Rrs, wavelengths, required, tol)
 
-	a = kwargs.get('a', 232.329)
-	b = kwargs.get('b', 23.174)
-	return a * (Rrs(753) * (1/Rrs(665) - 1/Rrs(708))) + b
+    a = kwargs.get('a', 232.329)
+    b = kwargs.get('b', 23.174)
+    return a * (Rrs(753) * (1 / Rrs(665) - 1 / Rrs(708))) + b

@@ -5,14 +5,14 @@ from pathlib import Path
 import numpy as np
 from tqdm import trange
 
-from .benchmarks import run_benchmarks
-from .meta import get_sensor_bands, SENSOR_LABEL, ANCILLARY, PERIODIC
-from .metrics import performance
-from .model import MDN
-from .parameters import get_args
-from .plot_utils import plot_scatter, plot_spectra
-from .transformers import TransformerPipeline, generate_scalers
-from .utils import get_labels, get_data, generate_config, using_feature, split_data, _load_datasets, compress
+from MDN.benchmarks import run_benchmarks
+from MDN.meta import get_sensor_bands, SENSOR_LABEL, ANCILLARY, PERIODIC
+from MDN.metrics import performance
+from MDN.model import MDN
+from MDN.parameters import get_args
+from MDN.plot_utils import plot_scatter, plot_spectra
+from MDN.transformers import TransformerPipeline, generate_scalers
+from MDN.utils import get_labels, get_data, generate_config, using_feature, split_data, _load_datasets, compress
 
 
 def get_estimates(args, x_train=None, y_train=None, x_test=None, y_test=None, output_slices=None, dataset_labels=None,

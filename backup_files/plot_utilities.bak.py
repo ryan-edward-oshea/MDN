@@ -6,40 +6,41 @@ Description:    This code file contains the helper functions needed to create hi
 
 Date Created:   September 2nd, 2024
 """
-import numpy as np
-import pandas as pd
 import matplotlib as mpl
-from matplotlib import pyplot as plt
 import matplotlib.patheffects as pe
 import matplotlib.ticker as ticker
+import numpy as np
+import pandas as pd
 import seaborn as sns
+from matplotlib import pyplot as plt
 
-from .utils import get_tile_data, get_tile_geographic_info
+from MDN.utils import get_tile_data, get_tile_geographic_info
 
 'Set display parameters for MATPLOTLIB'
-#plt.rcParams.update({
-#"font.family": "sans-serif",
-#"font.sans-serif": ["Helvetica"]})
-plt.rcParams['mathtext.default']='regular'
+# plt.rcParams.update({
+# "font.family": "sans-serif",
+# "font.sans-serif": ["Helvetica"]})
+plt.rcParams['mathtext.default'] = 'regular'
 SMALL_SIZE = 12
 MEDIUM_SIZE = 14
 BIGGER_SIZE = 16
 mrkSize = 5
-ASPECT="auto"
+ASPECT = "auto"
 cmap = "jet"
 
 mpl.rcParams['xtick.labelsize'] = SMALL_SIZE
 mpl.rcParams['ytick.labelsize'] = SMALL_SIZE
 
-plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
-plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
-plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
-plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
-plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
-plt.rc('legend', fontsize=MEDIUM_SIZE)    # legend fontsize
+plt.rc('font', size=SMALL_SIZE)  # controls default text sizes
+plt.rc('axes', titlesize=SMALL_SIZE)  # fontsize of the axes title
+plt.rc('axes', labelsize=MEDIUM_SIZE)  # fontsize of the x and y labels
+plt.rc('xtick', labelsize=SMALL_SIZE)  # fontsize of the tick labels
+plt.rc('ytick', labelsize=SMALL_SIZE)  # fontsize of the tick labels
+plt.rc('legend', fontsize=MEDIUM_SIZE)  # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
-def colorbar(mappable, ticks_list=None, lbl_list=None,):
+
+def colorbar(mappable, ticks_list=None, lbl_list=None, ):
     from mpl_toolkits.axes_grid1 import make_axes_locatable
     import matplotlib.pyplot as plt
     last_axes = plt.gca()
@@ -92,6 +93,7 @@ def add_identity(ax, *line_args, **line_kwargs):
     }
     ax.annotate(r'$\mathbf{1:1}$', xy=(0.87, 0.99), size=16, **ann_kwargs)
 
+
 def create_scatterplots_trueVsPred(y_true, y_pred, short_name=None, x_label=None, y_label=None, inplot_str=None,
                                    title="Model Performance", maxv_b=None, minv_b=None, ipython_mode=False):
     """
@@ -139,14 +141,14 @@ def create_scatterplots_trueVsPred(y_true, y_pred, short_name=None, x_label=None
         assert len(short_name) == y_true.shape[1], f"Expected {y_true.shape[1]} names. Got {len(short_name)}."
         assert all(isinstance(item, str) for item in short_name), "All elements of <short_names> must be strings"
     else:
-        short_name = [f"Var-{ii+1}" for ii in range(len(short_name))]
+        short_name = [f"Var-{ii + 1}" for ii in range(len(short_name))]
 
     'Check the labels provided'
     if x_label is not None:
         assert len(x_label) == y_true.shape[1], f"Expected {y_true.shape[1]} names. Got {len(x_label)}."
         assert all(isinstance(item, str) for item in x_label), "All elements of <x_label> must be strings"
     else:
-        x_label = [f"True Var-{ii+1}" for ii in range(len(short_name))]
+        x_label = [f"True Var-{ii + 1}" for ii in range(len(short_name))]
 
     if y_label is not None:
         assert len(y_label) == y_true.shape[1], f"Expected {y_true.shape[1]} names. Got {len(y_label)}."
@@ -163,7 +165,7 @@ def create_scatterplots_trueVsPred(y_true, y_pred, short_name=None, x_label=None
     if maxv_b is not None:
         assert len(maxv_b) == y_true.shape[1], f"Need to define limits for {y_true.shape[1]} plots . " \
                                                f"Got {len(maxv_b)}."
-        assert all (isinstance(item, int) for item in maxv_b), "The limits need to be integers"
+        assert all(isinstance(item, int) for item in maxv_b), "The limits need to be integers"
     else:
         maxv_b = [1] * y_true.shape[1]
 
@@ -175,19 +177,16 @@ def create_scatterplots_trueVsPred(y_true, y_pred, short_name=None, x_label=None
     else:
         minv_b = [-1] * y_true.shape[1]
 
-
-
     'Create the base figure and set its properties'
     fig1, axes = plt.subplots(nrows=1, ncols=y_true.shape[1], figsize=((7.5 * y_true.shape[1]), 7))
     axes = [ax for axs in np.atleast_1d(axes) for ax in np.atleast_1d(axs)]
     colors = ['xkcd:fresh green', 'xkcd:tangerine', 'xkcd:sky blue', 'xkcd:greyish blue', 'xkcd:goldenrod',
               'xkcd:clay', 'xkcd:bluish purple', 'xkcd:reddish']
 
-
     ctr = 0
     for lbl, y1, y2 in zip(short_name, y_true.T, y_pred.T):
         str1 = inplot_str[ctr]
-        #print(str1)
+        # print(str1)
 
         l_kws = {'color': colors[ctr], 'path_effects': [pe.Stroke(linewidth=4, foreground='k'), pe.Normal()],
                  'zorder': 22,
@@ -197,11 +196,12 @@ def create_scatterplots_trueVsPred(y_true, y_pred, short_name=None, x_label=None
         # curr_idx = 0
 
         minv = -2 if lbl == 'cdom' else minv_b[ctr]  # int(np.nanmin(y_true_log)) - 1 if product != 'aph' else -4
-        maxv = 3 if lbl == 'tss' else 3 if lbl == 'chl' else maxv_b[ctr]  # int(np.nanmax(y_true_log)) + 1 if product != 'aph' else 1
+        maxv = 3 if lbl == 'tss' else 3 if lbl == 'chl' else maxv_b[
+            ctr]  # int(np.nanmax(y_true_log)) + 1 if product != 'aph' else 1
         loc = ticker.LinearLocator(numticks=int(round((maxv - minv) / 0.5) + 1))
         # fmt = ticker.FuncFormatter(lambda i, _: r'$10$\textsuperscript{%.1f}' % i)
-        fmt1 = ticker.FuncFormatter(lambda i, _: r'%1.1f' % (10**i))
-        fmt2 = ticker.FuncFormatter(lambda i, _: r'%1.1f' % (10**i) if ((i /0.5) % 2 == 0) else '')
+        fmt1 = ticker.FuncFormatter(lambda i, _: r'%1.1f' % (10 ** i))
+        fmt2 = ticker.FuncFormatter(lambda i, _: r'%1.1f' % (10 ** i) if ((i / 0.5) % 2 == 0) else '')
 
         axes[ctr].set_ylim((minv, maxv))
         axes[ctr].set_xlim((minv, maxv))
@@ -231,16 +231,18 @@ def create_scatterplots_trueVsPred(y_true, y_pred, short_name=None, x_label=None
         add_identity(axes[ctr], ls='--', color='k', zorder=20)
 
         props = dict(boxstyle='round', facecolor='white', alpha=0.7)
-        str1 = (str1.strip()).replace(',' ,'\n')
-        axes[ctr].text(0.05, 0.95, str1, transform=axes[ctr].transAxes, fontsize=SMALL_SIZE*1, weight="bold",
+        str1 = (str1.strip()).replace(',', '\n')
+        axes[ctr].text(0.05, 0.95, str1, transform=axes[ctr].transAxes, fontsize=SMALL_SIZE * 1, weight="bold",
                        verticalalignment='top', bbox=props)
 
         textstr1 = r'(N=' + f"{(y2[valid]).shape[0]})"
-        axes[ctr].text(0.75, 0.1, textstr1, transform=axes[ctr].transAxes, fontsize=SMALL_SIZE*1, weight="bold",
+        axes[ctr].text(0.75, 0.1, textstr1, transform=axes[ctr].transAxes, fontsize=SMALL_SIZE * 1, weight="bold",
                        verticalalignment='top', bbox=props)
 
-        axes[ctr].set_xlabel(x_label[ctr].replace(' ', '\ ' if plt.rcParams['text.usetex'] else ' '), fontsize=MEDIUM_SIZE*1, labelpad=10)
-        axes[ctr].set_ylabel(y_label[ctr].replace(' ', '\ ' if plt.rcParams['text.usetex'] else ' '), fontsize=MEDIUM_SIZE*1, labelpad=10)
+        axes[ctr].set_xlabel(x_label[ctr].replace(' ', '\ ' if plt.rcParams['text.usetex'] else ' '),
+                             fontsize=MEDIUM_SIZE * 1, labelpad=10)
+        axes[ctr].set_ylabel(y_label[ctr].replace(' ', '\ ' if plt.rcParams['text.usetex'] else ' '),
+                             fontsize=MEDIUM_SIZE * 1, labelpad=10)
         axes[ctr].set_aspect('equal', 'box')
         axes[ctr].set_title(short_name[ctr])
         axes[ctr].grid()
@@ -310,7 +312,7 @@ def find_rgb_img(img, wvl_bands, PRISMA_mode=False):
     """
     assert img.shape[2] == len(wvl_bands), " Wavelengths should be associated with each band in the cube"
 
-    #img, wvl_bands, _, _ = extract_sensor_data(file_name, sensor, rhos=False)
+    # img, wvl_bands, _, _ = extract_sensor_data(file_name, sensor, rhos=False)
 
     'Get the RGB Bands'
     rgb_bands = [640, 550, 440]
@@ -339,22 +341,21 @@ def find_rgb_img(img, wvl_bands, PRISMA_mode=False):
     return img_rgb
 
 
-def identify_RGB_data(filename,verbose=False):
-	''' Return the Rrs/rhos data within the netcdf file, for wavelengths of the given sensor '''
-	from netCDF4 import Dataset
+def identify_RGB_data(filename, verbose=False):
+    ''' Return the Rrs/rhos data within the netcdf file, for wavelengths of the given sensor '''
+    from netCDF4 import Dataset
 
-	with Dataset(filename, 'r') as nc_data:
-		if 'geophysical_data' in nc_data.groups.keys():
-			nc_data = nc_data['geophysical_data']
-		for key in ['rhos', 'rayleigh_corrected','Rrs']:
-			has_key = lambda k: any([k in v for v in nc_data.variables])
-			wvl_key = f'{key}_' if has_key(f'{key}_') or key != 'Rrs' else 'Rw' # Polymer stores Rw=Rrs*pi
-			if has_key(wvl_key): 
-				if verbose: print(key,wvl_key,nc_data.variables.keys())
-				return key
-            
-    
-    
+    with Dataset(filename, 'r') as nc_data:
+        if 'geophysical_data' in nc_data.groups.keys():
+            nc_data = nc_data['geophysical_data']
+        for key in ['rhos', 'rayleigh_corrected', 'Rrs']:
+            has_key = lambda k: any([k in v for v in nc_data.variables])
+            wvl_key = f'{key}_' if has_key(f'{key}_') or key != 'Rrs' else 'Rw'  # Polymer stores Rw=Rrs*pi
+            if has_key(wvl_key):
+                if verbose: print(key, wvl_key, nc_data.variables.keys())
+                return key
+
+
 def find_rgb_img_nc(file_name, sensor, rhos=True, auto_determine_L1B=True):
     """
     This function can be used extract the RB composite from a NetCDF file
@@ -381,7 +382,7 @@ def find_rgb_img_nc(file_name, sensor, rhos=True, auto_determine_L1B=True):
         img = (f.groups['products']).variables['Lt']  # temperature variable
         wvl_bands = img.wavelengths
 
-    #img, wvl_bands, _, _ = extract_sensor_data(file_name, sensor, rhos=False)
+    # img, wvl_bands, _, _ = extract_sensor_data(file_name, sensor, rhos=False)
 
     'Get the RGB Bands'
     rgb_bands = [640, 550, 440]
@@ -410,7 +411,8 @@ def find_rgb_img_nc(file_name, sensor, rhos=True, auto_determine_L1B=True):
     return img_rgb
 
 
-def display_sat_rgb(file_name, sensor, figsize=(15, 5), title=None, ipython_mode=False, flipud=False, rhos=True, auto_determine_L1B=True):
+def display_sat_rgb(file_name, sensor, figsize=(15, 5), title=None, ipython_mode=False, flipud=False, rhos=True,
+                    auto_determine_L1B=True):
     """
     This function can be used extract an RGB image by using the rhos data present in a netCDF file
 
@@ -434,14 +436,13 @@ def display_sat_rgb(file_name, sensor, figsize=(15, 5), title=None, ipython_mode
     'Get the geographic information'
     lon, lat, extent = get_tile_geographic_info(file_name)
     'Get the rgb composite'
-    rgb_img = find_rgb_img_nc(file_name, sensor,rhos=rhos,auto_determine_L1B=auto_determine_L1B)
+    rgb_img = find_rgb_img_nc(file_name, sensor, rhos=rhos, auto_determine_L1B=auto_determine_L1B)
     if flipud: rgb_img = np.flipud(rgb_img)
-    
+
     'Display the results'
     fig1, ax1 = plt.subplots(figsize=figsize)
     fig1.patch.set_visible(True)
     ord = 0
-
 
     img1 = ax1.imshow(rgb_img, extent=extent, aspect=ASPECT, zorder=ord)
     if title != None:
@@ -454,8 +455,8 @@ def display_sat_rgb(file_name, sensor, figsize=(15, 5), title=None, ipython_mode
 
 
 def overlay_rgb_mdnProducts(rgb_img, model_preds, extent, img_uncert=None, product_name='Parameter',
-                            figsize=(15, 5), pred_ticks= [-1, 0, 1, 2], pred_uncert_ticks = [-1, 0, 1, 2],
-                            ipython_mode=False, img_uncert_lower=None,img_uncert_upper=None,fig1=None,ax1=None):
+                            figsize=(15, 5), pred_ticks=[-1, 0, 1, 2], pred_uncert_ticks=[-1, 0, 1, 2],
+                            ipython_mode=False, img_uncert_lower=None, img_uncert_upper=None, fig1=None, ax1=None):
     """
     This function can be used to overlay the MDN-prediction maps over the RGB compostite of a satellite image for display
 
@@ -519,10 +520,10 @@ def overlay_rgb_mdnProducts(rgb_img, model_preds, extent, img_uncert=None, produ
 
     if img_uncert is not None:
         fig1, (ax1, ax2) = plt.subplots(ncols=2, figsize=figsize, sharex=True, sharey=True)
-    elif img_uncert_upper is not None and img_uncert_lower is not None: 
+    elif img_uncert_upper is not None and img_uncert_lower is not None:
         fig1, (ax1, ax2, ax3) = plt.subplots(ncols=3, figsize=figsize, sharex=True, sharey=True)
     else:
-        if fig1 is None and ax1 is None: fig1, ax1= plt.subplots(figsize=figsize)
+        if fig1 is None and ax1 is None: fig1, ax1 = plt.subplots(figsize=figsize)
 
     fig1.patch.set_visible(True)
     ord = 0
@@ -534,11 +535,10 @@ def overlay_rgb_mdnProducts(rgb_img, model_preds, extent, img_uncert=None, produ
                       extent=extent, aspect=ASPECT, zorder=ord + 1)
     ax1.set_title(product_name, fontsize=BIGGER_SIZE, fontweight="bold")
     'Apply colorbar'
-    #pred_ticks = np.arange(np.floor(np.min(model_preds[model_preds > -5.9])), np.floor(np.max(model_preds))+1)
-    pred_labels = [f'{(10**(i)):.2f}'  for i in pred_ticks]
+    # pred_ticks = np.arange(np.floor(np.min(model_preds[model_preds > -5.9])), np.floor(np.max(model_preds))+1)
+    pred_labels = [f'{(10 ** (i)):.2f}' for i in pred_ticks]
     img2.set_clim(pred_ticks[0], pred_ticks[-1])
     colorbar(img2, ticks_list=pred_ticks, lbl_list=pred_labels)
-
 
     'Display the results - model uncertainty'
     if img_uncert is not None:
@@ -546,37 +546,39 @@ def overlay_rgb_mdnProducts(rgb_img, model_preds, extent, img_uncert=None, produ
         img3 = ax2.imshow(rgb_img, extent=extent, aspect=ASPECT, zorder=ord)
         'Normalize uncertainty'
         img4 = ax2.imshow(np.ma.masked_where(img_uncert <= -5.9, img_uncert), cmap=cmap,
-                      extent=extent, aspect=ASPECT, zorder=ord + 1)
+                          extent=extent, aspect=ASPECT, zorder=ord + 1)
         ax2.set_title(r"Total Uncertainty ($\sigma_{UNC}$)", fontsize=BIGGER_SIZE, fontweight="bold")
         img4.set_clim(pred_uncert_ticks[0], pred_uncert_ticks[-1])
-        pred_uncert_labels = [f'{(10**(i)):.2f}' for i in pred_uncert_ticks]   #[f'{i:2.3f}' for i in pred_uncert_ticks]
+        pred_uncert_labels = [f'{(10 ** (i)):.2f}' for i in
+                              pred_uncert_ticks]  # [f'{i:2.3f}' for i in pred_uncert_ticks]
         colorbar(img4, ticks_list=pred_uncert_ticks, lbl_list=pred_uncert_labels)
 
     if img_uncert_upper is not None and img_uncert_lower is not None:
-    	img_uncert_lower = np.log10(img_uncert_lower + 1.e-6)
-    	img_uncert_lower_1 = ax2.imshow(rgb_img, extent=extent, aspect=ASPECT, zorder=ord)
-    	'Normalize uncertainty'
-    	img_uncert_lower_2 = ax2.imshow(np.ma.masked_where(img_uncert_lower <= -5.9, img_uncert_lower), cmap=cmap,
-                      extent=extent, aspect=ASPECT, zorder=ord + 1)
-    	ax2.set_title(r"Lower Bound ($\sigma_{UNC}$)", fontsize=BIGGER_SIZE, fontweight="bold")
-    	img_uncert_lower_2.set_clim(pred_uncert_ticks[0], pred_uncert_ticks[-1])
-    	pred_uncert_labels = [f'{(10**(i)):.2f}' for i in pred_uncert_ticks]   #[f'{i:2.3f}' for i in pred_uncert_ticks]
-    	colorbar(img_uncert_lower_2, ticks_list=pred_uncert_ticks, lbl_list=pred_uncert_labels)
-    	
-    	img_uncert_upper = np.log10(img_uncert_upper + 1.e-6)
-    	img_uncert_upper_1 = ax3.imshow(rgb_img, extent=extent, aspect=ASPECT, zorder=ord)  	
-    	'Normalize uncertainty'
-    	img_uncert_upper_2 = ax3.imshow(np.ma.masked_where(img_uncert_upper <= -5.9, img_uncert_upper), cmap=cmap,
-                      extent=extent, aspect=ASPECT, zorder=ord + 1)
-    	ax3.set_title(r"Upper Bound ($\sigma_{UNC}$)", fontsize=BIGGER_SIZE, fontweight="bold")
-    	img_uncert_upper_2.set_clim(pred_uncert_ticks[0], pred_uncert_ticks[-1])
-    	pred_uncert_labels = [f'{(10**(i)):.2f}' for i in pred_uncert_ticks]   #[f'{i:2.3f}' for i in pred_uncert_ticks]
-    	colorbar(img_uncert_upper_2, ticks_list=pred_uncert_ticks, lbl_list=pred_uncert_labels)
-    	
-    	
-    	
+        img_uncert_lower = np.log10(img_uncert_lower + 1.e-6)
+        img_uncert_lower_1 = ax2.imshow(rgb_img, extent=extent, aspect=ASPECT, zorder=ord)
+        'Normalize uncertainty'
+        img_uncert_lower_2 = ax2.imshow(np.ma.masked_where(img_uncert_lower <= -5.9, img_uncert_lower), cmap=cmap,
+                                        extent=extent, aspect=ASPECT, zorder=ord + 1)
+        ax2.set_title(r"Lower Bound ($\sigma_{UNC}$)", fontsize=BIGGER_SIZE, fontweight="bold")
+        img_uncert_lower_2.set_clim(pred_uncert_ticks[0], pred_uncert_ticks[-1])
+        pred_uncert_labels = [f'{(10 ** (i)):.2f}' for i in
+                              pred_uncert_ticks]  # [f'{i:2.3f}' for i in pred_uncert_ticks]
+        colorbar(img_uncert_lower_2, ticks_list=pred_uncert_ticks, lbl_list=pred_uncert_labels)
+
+        img_uncert_upper = np.log10(img_uncert_upper + 1.e-6)
+        img_uncert_upper_1 = ax3.imshow(rgb_img, extent=extent, aspect=ASPECT, zorder=ord)
+        'Normalize uncertainty'
+        img_uncert_upper_2 = ax3.imshow(np.ma.masked_where(img_uncert_upper <= -5.9, img_uncert_upper), cmap=cmap,
+                                        extent=extent, aspect=ASPECT, zorder=ord + 1)
+        ax3.set_title(r"Upper Bound ($\sigma_{UNC}$)", fontsize=BIGGER_SIZE, fontweight="bold")
+        img_uncert_upper_2.set_clim(pred_uncert_ticks[0], pred_uncert_ticks[-1])
+        pred_uncert_labels = [f'{(10 ** (i)):.2f}' for i in
+                              pred_uncert_ticks]  # [f'{i:2.3f}' for i in pred_uncert_ticks]
+        colorbar(img_uncert_upper_2, ticks_list=pred_uncert_ticks, lbl_list=pred_uncert_labels)
+
     if not ipython_mode:
         return fig1
+
 
 if __name__ == "__main__":
     sensor = "OLCI"

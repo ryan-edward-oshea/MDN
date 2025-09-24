@@ -20,51 +20,48 @@ the calculation of xi with the band difference in the exponent.
 the 555nm band of MODIS (which is a land-focused band). 
 '''
 
-from ...utils import (
-    optimize, get_required, set_outputs, 
-    loadtxt, to_rrs, closest_wavelength,
-)
+import numpy as np
+from scipy.interpolate import CubicSpline as Interpolate
+
 from ...meta import (
-    h0, h1, h2,
-    g0_QAA as g0, 
+    g0_QAA as g0,
     g1_QAA as g1,
 )
+from ...utils import (
+    optimize, get_required, set_outputs,
+    loadtxt, to_rrs, closest_wavelength,
+)
 
-from scipy.interpolate import CubicSpline as Interpolate
-from pathlib import Path
-import numpy as np
 
-
-@set_outputs(['a', 'ap', 'ag', 'aph', 'apg', 'adg', 'b', 'bbp']) # Define the output product keys
-@optimize([]) # Define any optimizable parameters
+@set_outputs(['a', 'ap', 'ag', 'aph', 'apg', 'adg', 'b', 'bbp'])  # Define the output product keys
+@optimize([])  # Define any optimizable parameters
 def model(Rrs, wavelengths, *args, **kwargs):
     wavelengths = np.array(wavelengths)
     required = [443, 490, 550, 670]
-    tol  = kwargs.get('tol', 21) # allowable difference from the required wavelengths
-    Rrs  = get_required(Rrs, wavelengths, required, tol) # get values as a function: Rrs(443)
-    rrs  = get_required(to_rrs(Rrs(None)), wavelengths, required, tol)
+    tol = kwargs.get('tol', 21)  # allowable difference from the required wavelengths
+    Rrs = get_required(Rrs, wavelengths, required, tol)  # get values as a function: Rrs(443)
+    rrs = get_required(to_rrs(Rrs(None)), wavelengths, required, tol)
     if 'aph' in kwargs.keys():
-        a_ph = get_required(kwargs['aph'],wavelengths,required,tol)
+        a_ph = get_required(kwargs['aph'], wavelengths, required, tol)
     if 'ad' in kwargs.keys():
-        a_d = get_required(kwargs['ad'],wavelengths,required,tol)
+        a_d = get_required(kwargs['ad'], wavelengths, required, tol)
     if 'ag' in kwargs.keys():
-        a_g = get_required(kwargs['ag'],wavelengths,required,tol)
+        a_g = get_required(kwargs['ag'], wavelengths, required, tol)
 
+    absorb = Interpolate(*loadtxt('../IOP/aw').T)
+    scatter = Interpolate(*loadtxt('../IOP/bbw').T)
 
-    absorb  = Interpolate( *loadtxt('../IOP/aw').T  )
-    scatter = Interpolate( *loadtxt('../IOP/bbw').T )
-
-    get_band   = lambda k: closest_wavelength(k, wavelengths, tol=tol, validate=False)
+    get_band = lambda k: closest_wavelength(k, wavelengths, tol=tol, validate=False)
     functional = lambda v: get_required(v, wavelengths, [], tol)
 
     # Invert rrs formula to find u
-    u = functional( (-g0 + (g0**2 + 4 * g1 * rrs(None)) ** 0.5) / (2 * g1) )
+    u = functional((-g0 + (g0 ** 2 + 4 * g1 * rrs(None)) ** 0.5) / (2 * g1))
 
     # Next couple steps depends on if Rrs(670) is lt/gt 0.0015
     QAA_v5 = Rrs(670) < 0.0015
-    a_full = np.zeros(QAA_v5.shape) # a(lambda_0)
-    b_full = np.zeros(QAA_v5.shape) # b_bp(lambda_0)
-    l_full = np.zeros(QAA_v5.shape) # lambda_0
+    a_full = np.zeros(QAA_v5.shape)  # a(lambda_0)
+    b_full = np.zeros(QAA_v5.shape)  # b_bp(lambda_0)
+    l_full = np.zeros(QAA_v5.shape)  # lambda_0
 
     # --------------------
     # If Rrs(670) < 0.0015 (QAA v5)
@@ -72,10 +69,10 @@ def model(Rrs, wavelengths, *args, **kwargs):
         lambda0 = get_band(551)
         a_w = absorb(lambda0)
         b_w = scatter(lambda0)
-        #chi = np.log10( (rrs(443) + rrs(490)) / 
+        # chi = np.log10( (rrs(443) + rrs(490)) /
         #                (rrs(lambda0) + 5 * (rrs(670) / rrs(490)) * rrs(670)) )
 
-        #a = a_w + 10 ** (h0 + h1 * chi + h2 * chi**2)
+        # a = a_w + 10 ** (h0 + h1 * chi + h2 * chi**2)
         a = a_w + a_ph(lambda0) + a_d(lambda0) + a_g(lambda0)
         b = (u(lambda0) * a) / (1 - u(lambda0)) - b_w
 
@@ -113,33 +110,33 @@ def model(Rrs, wavelengths, *args, **kwargs):
 
     # Now decompose the absorption
     zeta = 0.74 + (0.2 / (0.8 + rrs(443) / rrs(551)))
-    S    = 0.015 + (0.002 / (0.6 + rrs(443) / rrs(551)))
-    xi   = np.exp(S * (get_band(443)-get_band(412))) 
+    S = 0.015 + (0.002 / (0.6 + rrs(443) / rrs(551)))
+    xi = np.exp(S * (get_band(443) - get_band(412)))
 
     # {a_g443, a_dg, a_ph} all require a 412nm band (thus are not available for e.g. OLI)
-    a_g443 =  (a(get_band(412)) - zeta * a(443)) / (xi - zeta) \
-            - (absorb(get_band(412)) - zeta * absorb(get_band(443))) / (xi - zeta)
+    a_g443 = (a(get_band(412)) - zeta * a(443)) / (xi - zeta) \
+             - (absorb(get_band(412)) - zeta * absorb(get_band(443))) / (xi - zeta)
 
     a_dg = a_g443 * np.exp(S * (get_band(443) - wavelengths))
     # a_dg = a_d(wavelengths) + a_g(wavelengths)
-    a_ph = a(None) - a_dg - absorb(wavelengths) # differs from pdf doc; shown in spreadsheet    
+    a_ph = a(None) - a_dg - absorb(wavelengths)  # differs from pdf doc; shown in spreadsheet
 
     # Remove negatives
     b[b < 0] = 1e-5
-    #a_ph[a_ph < 0] = 1e-5
+    # a_ph[a_ph < 0] = 1e-5
 
     # QAA-CDOM - Zhu & Yu 2013
     a_p = 0.63 * b ** 0.88
-    a_g = a(None) - absorb(get_band(443)) - a_p  
-    
+    a_g = a(None) - absorb(get_band(443)) - a_p
+
     # Return all backscattering and absorption parameters
     return {
-        'a'  : a(None),
+        'a': a(None),
         'aph': a_ph,
-        'ap' : a_p, # a_ph + (a_dg - a_g)
-        'ag' : a_g,
+        'ap': a_p,  # a_ph + (a_dg - a_g)
+        'ag': a_g,
         'apg': a_ph + a_dg,
-        'adg': a_dg, 
-        'b'  : b + b_w,
+        'adg': a_dg,
+        'b': b + b_w,
         'bbp': b,
     }
