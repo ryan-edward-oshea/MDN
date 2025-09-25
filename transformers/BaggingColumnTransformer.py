@@ -29,5 +29,3 @@ class BaggingColumnTransformer(_CustomTransformer):
 
     def _transform(self, X, *args, **kwargs):
         return X[:, self.cols.astype(int)]
-
-

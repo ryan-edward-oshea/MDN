@@ -959,12 +959,12 @@ def map_cube_mdn_full(args, img_data, wvl_bands, land_mask=False, landmask_thres
 
     'Compare the model bands to the available bands '
     sensor_bands = get_sensor_bands(args.sensor)
-    if sensor_bands != wvl_bands:
+    if not np.array_equal(np.asarray(sensor_bands), np.asarray(wvl_bands)):
         valid_bands = []
         for item in sensor_bands:
             assert np.min(np.abs(np.asarray(wvl_bands) - item)) <= 5, f"The bands provided-{wvl_bands} do not " \
                                                                       f"agree with the sensor bands {sensor_bands}"
-            valid_bands += [np.argmin(np.abs(np.asarray(wvl_bands) - item))]
+            valid_bands += [int(np.argmin(np.abs(np.asarray(wvl_bands) - item)))]
 
     'Only selecting the valid bands for this model'
     wvl_bands = np.asarray(wvl_bands)[valid_bands]
@@ -985,7 +985,7 @@ def map_cube_mdn_full(args, img_data, wvl_bands, land_mask=False, landmask_thres
         water_spectra = img_data[water_pixels[0], water_pixels[1], :]
     else:
         'Get a simple mask removing pixels with Nan values'
-        img_mask = np.asarray((np.isnan(np.min(img_data, axis=2))), dtype=np.float)
+        img_mask = np.asarray((np.isnan(np.min(img_data, axis=2))), dtype=float)
 
         'Get the locations/spectra for the valid water pixels'
         water_pixels = np.where(img_mask == 0)

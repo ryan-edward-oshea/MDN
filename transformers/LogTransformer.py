@@ -21,4 +21,3 @@ class LogTransformer(_CustomTransformer):
     @staticmethod
     def config_info(*args, **kwargs):
         return "LogTransformer"
-

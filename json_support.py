@@ -11,12 +11,14 @@ Email:                  arun.saranathan@ssaihq.com
                         fnu.arunmuralidharansaranathan@nasa.gov
 """
 
-import json
 import importlib
-import numpy as np
-from sklearn.base import TransformerMixin
+import json
 from pathlib import Path
+
+import numpy as np
 import tensorflow as tf
+from sklearn.base import TransformerMixin
+
 from .transformers import TransformerPipeline
 
 
@@ -24,15 +26,32 @@ from .transformers import TransformerPipeline
 # Helpers for sklearn Transformers
 # -------------------
 
+def serialize_list(lst):
+    """Recursively convert a list with numpy types into JSON-serializable form."""
+    if isinstance(lst, list):
+        return [serialize_list(x) for x in lst]
+    elif isinstance(lst, np.ndarray):
+        return lst.tolist()
+    elif isinstance(lst, (np.integer, int)):
+        return int(lst)
+    elif isinstance(lst, (np.floating, float)):
+        return float(lst)
+    elif isinstance(lst, (np.bool_, bool)):
+        return bool(lst)
+    else:
+        return lst
+
 def serialize_transformer(transformer):
     """Convert any sklearn TransformerMixin into a JSON-safe dict."""
-    params = transformer.get_params(deep=False)
+    params = make_serializable(transformer.get_params(deep=False))
     state = {}
     for attr, val in transformer.__dict__.items():
         if isinstance(val, np.ndarray):
             state[attr] = val.tolist()
         elif isinstance(val, (np.generic,)):  # np.int32, np.float64, etc.
             state[attr] = val.item()
+        elif isinstance(val, list):
+            state[attr] = serialize_list(val)
         else:
             try:
                 json.dumps(val)  # check if natively serializable
@@ -100,7 +119,7 @@ def make_serializable(obj):
     elif isinstance(obj, Path):
         return {"_kind": "Path", "data": str(obj)}
     elif isinstance(obj, slice):
-        return {"_kind": "Slice", "start": obj.start, "stop": obj.stop, "step": obj.step}
+        return {"_kind": "Slice", "start": int(obj.start), "stop": int(obj.stop), "step": obj.step}
     elif isinstance(obj, np.random.RandomState):
         state = obj.get_state()
         state_list = list(state)
@@ -128,7 +147,7 @@ def restore_object(obj):
             return Path(obj["data"])
 
         elif kind == "Slice":
-            return slice(obj["start"], obj["stop"], obj["step"])
+            return slice(int(obj["start"]), int(obj["stop"]), obj["step"])
 
         elif kind == "NumpyRandomState":
             state = list(tuple(obj["data"]))

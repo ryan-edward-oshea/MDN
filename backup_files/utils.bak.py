@@ -1,4 +1,3 @@
-import MDN
 import functools
 import hashlib
 import os
@@ -12,6 +11,7 @@ from datetime import datetime as dt
 from importlib import import_module
 from pathlib import Path
 
+import MDN
 from MDN.__version__ import __version__
 from MDN.meta import get_sensor_bands, ANCILLARY, PERIODIC
 from MDN.parameters import update, hypers, flags, get_args

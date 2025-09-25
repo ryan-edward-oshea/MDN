@@ -18,6 +18,8 @@ import random
 from ..transformers import IdentityTransformer
 from ..utils import read_pkl, ignore_warnings
 from ..json_support import store_json, read_json
+from ..compat_patch import apply_all
+apply_all()
 
 from .callbacks import PlottingCallback, StatsCallback, ModelCheckpoint
 from .utils import initialize_random_states, ensure_format, get_device
@@ -384,17 +386,12 @@ class MDN:
             self.update_config(read_json(self.model_path.joinpath('config.json')),
                                ['scalerx', 'scalery', 'tf_random', 'np_random'])
         elif self.model_path.joinpath('config.pkl').is_file():
-            try:
-                'If legacy model get the config from pkl'
-                self.update_config(read_pkl(self.model_path.joinpath('config.pkl')),
-                                   ['scalerx', 'scalery', 'tf_random', 'np_random'])
-                'save as npz for forward comaptibility'
-                store_json(self.model_path.joinpath('config.json'), self.get_config())
+            'If legacy model - convert config from PKL to JSON'
+            store_json(self.model_path.joinpath('config.json'), read_pkl(self.model_path.joinpath('config.pkl')))
+            self.update_config(read_json(self.model_path.joinpath('config.json')),
+                               ['scalerx', 'scalery', 'tf_random', 'np_random'])
 
-            except:
-                assert True, f"❌. While a pickled version of the config exists it was pickled using a newer version" \
-                             f" of numpy. Run with native environment to save config as .npz for compatibility across" \
-                             f"versions."
+
 
         tf.random.set_global_generator(self.tf_random)
         'Load version appropriate model name'

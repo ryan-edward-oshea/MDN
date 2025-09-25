@@ -1,4 +1,3 @@
-import MDN
 import functools
 import hashlib
 import os
@@ -15,6 +14,7 @@ from pathlib import Path
 import numpy as np
 import xarray as xr
 
+import MDN
 from .__version__ import __version__
 from .meta import get_sensor_bands, ANCILLARY, PERIODIC
 from .parameters import update, hypers, flags, get_args
@@ -114,8 +114,11 @@ def download_weights(model_path_name):
         'd3ebd0b61b79f3fc1dc8fe8c83cb144fca54ad4a93e951cd3cddd728625b7733': ["PACE",
                                                                              MDN_folder + 'PACE/d3ebd0b61b79f3fc1dc8fe8c83cb144fca54ad4a93e951cd3cddd728625b7733.zip',
                                                                              "https://nasagov.box.com/shared/static/81pa0tv6uklxt1vko3jt7l1mgmpmgraz.zip"],
-        '698e59d1c9f604a5956a303f6d472c6b8e6a064d10b3f5131b452666fd712b2d': ["PACE-delivery",
-                                                                             MDN_folder + 'PACE-delivery/698e59d1c9f604a5956a303f6d472c6b8e6a064d10b3f5131b452666fd712b2d.zip',
+        '6f2a6b07f6e8b5723a80c389456e13a6f17d7db02024a425f15f0b340fbb97e0': ["PACE-delivery",
+                                                                             MDN_folder + 'PACE-delivery/6f2a6b07f6e8b5723a80c389456e13a6f17d7db02024a425f15f0b340fbb97e0.zip',
+                                                                             "https://nasagov.box.com/shared/static/eevzbezbl5xj5p7irp3jk20g0gmtlgqb.zip"],
+        'a854e7a8e92ff0eeb3ae6388a8c1f8255c2a809c1b4a3ec3faf639953e3fde28': ["PACE-delivery",
+                                                                             MDN_folder + 'PACE-delivery/a854e7a8e92ff0eeb3ae6388a8c1f8255c2a809c1b4a3ec3faf639953e3fde28.zip',
                                                                              "https://nasagov.box.com/shared/static/eevzbezbl5xj5p7irp3jk20g0gmtlgqb.zip"],
         '3559908f0e198546e108084db62ba17b644bffe31d40adabfa9752cb43bcacbc': ["PACE-delivery",
                                                                              MDN_folder + 'PACE-delivery/3559908f0e198546e108084db62ba17b644bffe31d40adabfa9752cb43bcacbc.zip',
@@ -459,50 +462,53 @@ def generate_config(args, create=True, verbose=True):
     # Can override the model uid in order to allow prior MDN versions to be run
     if hasattr(args, 'model_uid'):
         if args.verbose: print(f'Using manually set model uid: {args.model_uid}')
-        return root.joinpath(args.model_uid)
+        folder = root.joinpath(args.model_uid)
 
-    # Hash is always dependent upon these values
-    dependents = [getattr(act, 'dest', '') for group in [hypers, update] for act in group._group_actions]
-    dependents += ['x_scalers', 'y_scalers']
-    if args.sensor in ['PRISMA', 'HICO', 'PACE',
-                       'PACE-delivery'] and args.product == 'aph,chl,tss,pc,ad,ag,cdom': dependents += ['allow_missing',
-                                                                                                        'allow_nan_inp',
-                                                                                                        'allow_nan_out',
-                                                                                                        'filter_ad_ag',
-                                                                                                        'min_in_out_val',
-                                                                                                        'removed_dataset']
+    else:
 
-    # Hash is only partially dependent upon these values, assuming operation changes when using a feature
-    #  - 'use_' flags being set cause dependency
-    #  - 'no_'  flags being set remove dependency
-    # This allows additional flags to be added without breaking prior model compatibility
-    partials = [getattr(act, 'dest', '') for group in [flags] for act in group._group_actions]
+        # Hash is always dependent upon these values
+        dependents = [getattr(act, 'dest', '') for group in [hypers, update] for act in group._group_actions]
+        dependents += ['x_scalers', 'y_scalers']
+        if args.sensor in ['PRISMA', 'HICO', 'PACE',
+                           'PACE-delivery'] and args.product == 'aph,chl,tss,pc,ad,ag,cdom': dependents += ['allow_missing',
+                                                                                                            'allow_nan_inp',
+                                                                                                            'allow_nan_out',
+                                                                                                            'filter_ad_ag',
+                                                                                                            'min_in_out_val',
+                                                                                                            'removed_dataset']
 
-    config = [f'Version: {__version__}', '', 'Dependencies']
-    config += [''.join(['-'] * len(config[-1]))]
-    others = ['', 'Configuration']
-    others += [''.join(['-'] * len(others[-1]))]
+        # Hash is only partially dependent upon these values, assuming operation changes when using a feature
+        #  - 'use_' flags being set cause dependency
+        #  - 'no_'  flags being set remove dependency
+        # This allows additional flags to be added without breaking prior model compatibility
+        partials = [getattr(act, 'dest', '') for group in [flags] for act in group._group_actions]
 
-    for k, v in sorted(args.__dict__.items(), key=lambda z: z[0]):
-        if k in ['x_scalers', 'y_scalers']:
-            cinfo = lambda s, sarg, skw: getattr(s, 'config_info', lambda *a, **k: '')(*sarg, **skw)
-            cfmt = lambda *cargs: f' # {cinfo(*cargs)}' if cinfo(*cargs) else ''
-            v = '\n\t' + '\n\t'.join(
-                [f'{(s[0].__name__,) + s[1:]}{cfmt(*s)}' for s in v])  # stringify scaler and its arguments
+        config = [f'Version: {__version__}', '', 'Dependencies']
+        config += [''.join(['-'] * len(config[-1]))]
+        others = ['', 'Configuration']
+        others += [''.join(['-'] * len(others[-1]))]
 
-        if k in partials and using_feature(args, k):
-            config.append(f'{k:<18}: {v}')
-        elif k in dependents:
-            config.append(f'{k:<18}: {v}')
-        else:
-            others.append(f'{k:<18}: {v}')
+        for k, v in sorted(args.__dict__.items(), key=lambda z: z[0]):
+            if k in ['x_scalers', 'y_scalers']:
+                cinfo = lambda s, sarg, skw: getattr(s, 'config_info', lambda *a, **k: '')(*sarg, **skw)
+                cfmt = lambda *cargs: f' # {cinfo(*cargs)}' if cinfo(*cargs) else ''
+                v = '\n\t' + '\n\t'.join(
+                    [f'{(s[0].__name__,) + s[1:]}{cfmt(*s)}' for s in v])  # stringify scaler and its arguments
 
-    config = '\n'.join(config)  # Model is dependent on some arguments, so they change the uid
-    others = '\n'.join(others)  # Other arguments are stored for replicability
-    ver_re = r'(Version\: \d+\.\d+)(?:\.\d+\n)'  # Match major/minor version within subgroup, patch/dashes within pattern
-    h_str = re.sub(ver_re, r'\1.0\n', config)  # Substitute patch version for ".0" to allow patches within the same uid
-    uid = hashlib.sha256(h_str.encode('utf-8')).hexdigest()
-    folder = root.joinpath(uid)
+            if k in partials and using_feature(args, k):
+                config.append(f'{k:<18}: {v}')
+            elif k in dependents:
+                config.append(f'{k:<18}: {v}')
+            else:
+                others.append(f'{k:<18}: {v}')
+
+        config = '\n'.join(config)  # Model is dependent on some arguments, so they change the uid
+        others = '\n'.join(others)  # Other arguments are stored for replicability
+        ver_re = r'(Version\: \d+\.\d+)(?:\.\d+\n)'  # Match major/minor version within subgroup, patch/dashes within pattern
+        h_str = re.sub(ver_re, r'\1.0\n', config)  # Substitute patch version for ".0" to allow patches within the same uid
+        uid = hashlib.sha256(h_str.encode('utf-8')).hexdigest()
+        folder = root.joinpath(uid)
+
     c_file = folder.joinpath('config')
     download_weights(folder.stem)
     try:
