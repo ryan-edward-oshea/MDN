@@ -25,8 +25,7 @@ def get_estimates(args, x_train=None, y_train=None, x_test=None, y_test=None, ou
     generate_scalers(args, x_train, x_test)
 
     if args.verbose:
-        print(
-            f'\nUsing {len(args.wavelengths)} wavelength(s) in the range [{args.wavelengths[0]}, {args.wavelengths[-1]}]')
+        print(f'\nUsing {len(args.wavelengths)} wavelength(s) in the range [{args.wavelengths[0]}, {args.wavelengths[-1]}]')
         if x_train is not None: print_dataset_stats(x=x_train, label='Train')
         if y_train is not None: print_dataset_stats(y=y_train, label='Train')
         if x_test is not None: print_dataset_stats(x=x_test, label='Test')
