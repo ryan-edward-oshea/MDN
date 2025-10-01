@@ -17,3 +17,5 @@ tqdm==4.67.1
 tf_keras==2.20.1
 xarray==2025.7.1
 tensorflow_probability==0.25.0
+psycopg2-binary>=2.9
+gdal>=3.11
