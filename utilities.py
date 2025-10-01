@@ -454,12 +454,12 @@ def get_mdn_preds_uncertainties(test_x, args=None, sensor="OLCI", products="chl"
             final_uncertainties_ub = np.asarray(mdn_uncertainties['upp_lim'])
 
 
-            return final_predictions, (final_uncertainties_lb, final_uncertainties_ub)
+            return final_predictions, (final_uncertainties_lb, final_uncertainties_ub), mdn_preds_desc
 
         else:
             # If using composite uncertainties extract that
             final_uncertainties = np.asarray(mdn_uncertainties['comp_unc'])
-            return final_predictions, final_uncertainties
+            return final_predictions, final_uncertainties, mdn_preds_desc
     else:
         if flg_uncert_limits:
             final_uncertainties_lb = np.stack(
@@ -467,9 +467,9 @@ def get_mdn_preds_uncertainties(test_x, args=None, sensor="OLCI", products="chl"
             final_uncertainties_ub = np.stack(
                 [mdn_uncertainties['upp_lim'][f"Model-{ii}"] for ii in range(len(mdn_uncertainties))], axis=0)
 
-            return mdn_predictions, (final_uncertainties_lb, final_uncertainties_ub)
+            return mdn_predictions, (final_uncertainties_lb, final_uncertainties_ub), mdn_preds_desc
         else:
-            return mdn_predictions, np.stack([mdn_uncertainties[f"Model-{i}"] for i in range(10)], axis=0)
+            return mdn_predictions, np.stack([mdn_uncertainties[f"Model-{i}"] for i in range(10)], axis=0), mdn_preds_desc
 
 
 
@@ -608,8 +608,8 @@ def map_cube_mdn_full(args, img_data, wvl_bands, land_mask=False, landmask_thres
 
             'Get the estimates and uncertainties'
             if flg_uncert_limits:
-                block_estimates, block_uncertainties_lb,  \
-                    block_uncertainties_ub= get_mdn_preds_uncertainties(temp,
+                block_estimates, (block_uncertainties_lb,  \
+                    block_uncertainties_ub), op_slices= get_mdn_preds_uncertainties(temp,
                                                                         args=args, sensor=args.sensor,
                                                                         products=args.product,
                                                                         scaler_mode=scaler_mode,
@@ -626,7 +626,7 @@ def map_cube_mdn_full(args, img_data, wvl_bands, land_mask=False, landmask_thres
                     final_uncertainties_lb = np.vstack((final_uncertainties_lb, block_uncertainties_lb))
                     final_uncertainties_ub = np.vstack((final_uncertainties_ub, block_uncertainties_ub))
             else:
-                block_estimates, block_uncertainties = get_mdn_preds_uncertainties(temp, args=args, sensor=args.sensor,
+                block_estimates, block_uncertainties, op_slices = get_mdn_preds_uncertainties(temp, args=args, sensor=args.sensor,
                                                                                    products=args.product,
                                                                                    scaler_mode=scaler_mode,
                                                                                    uncert_mode= uncert_mode,
@@ -654,13 +654,13 @@ def map_cube_mdn_full(args, img_data, wvl_bands, land_mask=False, landmask_thres
             img_uncert_ub[water_pixels[0][~water_mask], water_pixels[1][~water_mask],] = \
                 np.squeeze(np.asarray(final_uncertainties_ub))
 
-            return img_preds, (img_uncert_lb, img_uncert_ub)
+            return img_preds, (img_uncert_lb, img_uncert_ub), op_slices
         else:
             img_uncert = np.zeros((img_data.shape[0], img_data.shape[1], final_estimates.shape[-1]))
             img_uncert[water_pixels[0][~water_mask], water_pixels[1][~water_mask],] = \
                 np.squeeze(np.asarray(final_uncertainties))
 
-            return img_preds, img_uncert
+            return img_preds, img_uncert, op_slices
 
     else:
         'Create and return cube of only 0 of the appropriate size'
@@ -669,10 +669,10 @@ def map_cube_mdn_full(args, img_data, wvl_bands, land_mask=False, landmask_thres
         if flg_uncert_limits:
             img_uncert_lb = np.zeros((img_data.shape[0], img_data.shape[1], args['data_ytrain_shape'][1]))
             img_uncert_ub = np.zeros((img_data.shape[0], img_data.shape[1], args['data_ytrain_shape'][1]))
-            return img_preds, (img_uncert_lb, img_uncert_ub)
+            return img_preds, (img_uncert_lb, img_uncert_ub), op_slices
         else:
             img_uncert = np.zeros((img_data.shape[0], img_data.shape[1], args['data_ytrain_shape'][1]))
 
 
-            return img_preds, img_uncert
+            return img_preds, img_uncert. op_slices
 
